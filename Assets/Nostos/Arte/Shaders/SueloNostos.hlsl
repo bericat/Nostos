@@ -95,6 +95,13 @@ float3 CapaN(TEXTURE2D_PARAM(tex, smp), TEXTURE2D_PARAM(texN, smpN), float2 xz, 
     return lerp(a, b, mezcla);
 }
 
+/// Verde natural: menos saturado y menos amarillo (lineal).
+float3 TonoHierbaN(float3 c)
+{
+    float luz = dot(c, float3(0.2126, 0.7152, 0.0722));
+    return lerp(luz.xxx, c, 0.75) * float3(0.55, 0.68, 0.55);
+}
+
 /// El suelo en un punto: albedo lineal y normal de detalle (x y z del mundo en .xy, arriba en .z).
 /// Las caras de roca siguen con su color de paleta.
 float3 SueloN(float3 paleta, float2 xz, out float3 normalDetalle)
@@ -108,9 +115,11 @@ float3 SueloN(float3 paleta, float2 xz, out float3 normalDetalle)
     float3 hierba = CapaN(TEXTURE2D_ARGS(_Cesped, sampler_Cesped), TEXTURE2D_ARGS(_CespedN, sampler_Cesped), xz, TAM_HIERBA, mezcla, nH);
     float3 barroHierba = CapaN(TEXTURE2D_ARGS(_BarroHierba, sampler_Cesped), TEXTURE2D_ARGS(_BarroHierbaN, sampler_Cesped), xz, TAM_BARRO_HIERBA, mezcla, nBH);
     float3 barro = CapaN(TEXTURE2D_ARGS(_Barro, sampler_Cesped), TEXTURE2D_ARGS(_BarroN, sampler_Cesped), xz, TAM_BARRO, mezcla, nB);
-    // La hierba cambia de tono a manchas grandes (más seca o más verde), sin seguir las caras.
+    // La hierba del paquete sale verde lima con nuestra luz: a un verde natural (biblia, #76A946),
+    // y con manchas grandes más secas o más verdes, sin seguir las caras.
+    hierba = TonoHierbaN(hierba);
     float tono = RuidoN(xz * 0.035 + 3.0) * 0.7 + RuidoN(xz * 0.11 + 17.0) * 0.3;
-    hierba *= lerp(float3(0.9, 1.0, 0.92), float3(1.1, 1.04, 0.84), smoothstep(0.3, 0.75, tono));
+    hierba *= lerp(float3(0.9, 1.0, 0.95), float3(1.08, 1.0, 0.85), smoothstep(0.3, 0.75, tono));
     float3 color = lerp(lerp(hierba, barroHierba, aBarroHierba), barro, aBarro);
     float3 n = normalize(lerp(lerp(nH, nBH, aBarroHierba), nB, aBarro));
     normalDetalle = normalize(lerp(float3(0, 0, 1), n, suelo));

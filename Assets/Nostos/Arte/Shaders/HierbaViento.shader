@@ -107,7 +107,8 @@ Shader "Nostos/HierbaViento" {
                 UNITY_SETUP_INSTANCE_ID(i);
                 half4 mata = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv);
                 clip(mata.a - _Cutoff);
-                float3 albedo = mata.rgb * _BaseColor.rgb;
+                // El mismo verde natural que el suelo (TonoHierbaN), con el tono del material encima.
+                float3 albedo = TonoHierbaN(mata.rgb) * _BaseColor.rgb;
                 albedo *= 1.0 + (i.azar - 0.5) * 2.0 * _Variacion;
                 albedo *= lerp(1.0 - _Sombra, 1.0, saturate(i.uv.y * 1.4));
                 float3 color = IluminarN(albedo, float3(0, 1, 0), i.posWS, i.posCS);
