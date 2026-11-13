@@ -88,22 +88,43 @@ namespace Nostos.EditorTools
         [InitializeOnLoadMethod]
         static void AlCargar()
         {
-            EditorApplication.delayCall += () =>
+            EditorApplication.delayCall += () => Revisar(false);
+            // Si la recompilación llega al darle a Play, la escena vieja no se juega: se para, se
+            // monta la nueva y se avisa. Al volver de Play también se revisa.
+            EditorApplication.playModeStateChanged -= AlCambiarModo;
+            EditorApplication.playModeStateChanged += AlCambiarModo;
+        }
+
+        static bool EscenaAlDia => File.Exists(RutaEscena) && File.Exists(RutaMarca)
+                                   && File.ReadAllText(RutaMarca).Trim() == Version;
+
+        static void AlCambiarModo(PlayModeStateChange cambio)
+        {
+            if (cambio == PlayModeStateChange.ExitingEditMode && !EscenaAlDia)
             {
-                bool alDia = File.Exists(RutaEscena) && File.Exists(RutaMarca)
-                             && File.ReadAllText(RutaMarca).Trim() == Version;
-                if (alDia) return;
-                // Un solo intento automático por sesión del editor; después, por el menú.
-                if (SessionState.GetBool("Nostos.Escena." + Version, false)) return;
-                if (EditorApplication.isPlayingOrWillChangePlaymode) return;
-                SessionState.SetBool("Nostos.Escena." + Version, true);
-                if (SceneManager.GetActiveScene().isDirty)
-                {
-                    Debug.Log("Nostos: guarda la escena actual y usa el menú Nostos > Crear escena para montar la " + Version + ".");
-                    return;
-                }
-                Crear();
-            };
+                EditorApplication.isPlaying = false;
+                Debug.Log("Nostos: la escena es de una versión anterior; monto la " + Version + " antes de jugar. Dale a Play cuando termine.");
+                EditorApplication.delayCall += () => Revisar(true);
+            }
+            else if (cambio == PlayModeStateChange.EnteredEditMode)
+            {
+                EditorApplication.delayCall += () => Revisar(false);
+            }
+        }
+
+        static void Revisar(bool forzar)
+        {
+            if (EscenaAlDia) return;
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            // Un solo intento automático por sesión del editor (salvo al ir a jugar); después, por el menú.
+            if (!forzar && SessionState.GetBool("Nostos.Escena." + Version, false)) return;
+            SessionState.SetBool("Nostos.Escena." + Version, true);
+            if (SceneManager.GetActiveScene().isDirty && !forzar)
+            {
+                Debug.Log("Nostos: guarda la escena actual y usa el menú Nostos > Crear escena para montar la " + Version + ".");
+                return;
+            }
+            Crear();
         }
 
         [MenuItem("Nostos/Crear escena")]

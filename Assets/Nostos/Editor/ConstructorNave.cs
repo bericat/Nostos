@@ -179,7 +179,7 @@ namespace Nostos.EditorTools
             casco.ancho = NaveAncho;
             casco.fondo = NaveFondo;
             casco.cuerpo = cuerpo;
-            casco.giroNaufragio = new Vector3(6f, 0f, -11f);
+            casco.giroNaufragio = new Vector3(9f, 0f, -11f);
             casco.hundimiento = 0.75f;
 
             // La nave ya en su postura de naufragio (CascoNave la mantiene igual al jugar), para que
@@ -206,7 +206,7 @@ namespace Nostos.EditorTools
             }
             // Tierra echada sobre el casco: arrimada a la panza y a los costados, en montón.
             var colores = new ColorTerreno(surco);
-            Enterrar(piezasNucleo, valle, colores, restos, "casco", 0.6f, 2.4f, 0.45f);
+            Enterrar(piezasNucleo, valle, colores, restos, "casco", 0.6f, 2.4f, 0.45f, Morro(piezasNucleo, cuerpo.forward));
             casco.restos = TirarPiezas(valle, surco, restos, escala, pintura, colores);
 
             // Humo y fuego: del hueco de los motores y de la tierra quemada.
@@ -734,6 +734,29 @@ namespace Nostos.EditorTools
                 bool positivo = d1 > 0 || d2 > 0 || d3 > 0;
                 return !(negativo && positivo);
             }
+        }
+
+        /// <summary>El punto del casco más adelantado (la punta del morro), en el mundo.</summary>
+        static Vector3 Morro(List<GameObject> nucleo, Vector3 delante)
+        {
+            Vector3 mejor = Vector3.zero;
+            float max = float.MinValue;
+            foreach (GameObject pieza in nucleo)
+                foreach (MeshFilter f in pieza.GetComponentsInChildren<MeshFilter>())
+                {
+                    if (f.sharedMesh == null || f.GetComponent<Renderer>() == null) continue;
+                    foreach (Vector3 v in f.sharedMesh.vertices)
+                    {
+                        Vector3 w = f.transform.TransformPoint(v);
+                        float d = Vector3.Dot(w, delante);
+                        if (d > max)
+                        {
+                            max = d;
+                            mejor = w;
+                        }
+                    }
+                }
+            return mejor;
         }
 
         // ------------------------------------------------------------------ piezas arrancadas

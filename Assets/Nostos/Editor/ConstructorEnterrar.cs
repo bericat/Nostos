@@ -15,8 +15,9 @@ namespace Nostos.EditorTools
         /// <param name="alto">Lo que sube la tierra arrimada a la pieza (m).</param>
         /// <param name="ancho">Hasta dónde llega el montón desde la pieza (m).</param>
         /// <param name="quema">Cuánto se quemó la tierra (0..1).</param>
+        /// <param name="morro">Punta que quedó clavada: la tierra la cubre en cono y la pieza sale de ella.</param>
         static GameObject Enterrar(IEnumerable<GameObject> piezas, Valle valle, ColorTerreno colores, Transform padre,
-            string nombre, float alto, float ancho, float quema)
+            string nombre, float alto, float ancho, float quema, Vector3? morro = null)
         {
             var lista = new List<GameObject>(piezas);
             if (lista.Count == 0) return null;
@@ -92,6 +93,19 @@ namespace Nostos.EditorTools
                         // plana, sin taparla del todo.
                         if (!float.IsNaN(panza[k]) && panza[k] > suelo[k]) altura = Mathf.Min(altura, panza[k] - 0.02f);
                         if (!float.IsNaN(lomo[k]) && dist[k] == 0f) altura = Mathf.Min(altura, Mathf.Max(suelo[k] - 0.07f, lomo[k] - 0.04f));
+                        if (morro.HasValue)
+                        {
+                            // La punta clavada: un montón en cono por encima de ella, con terrones.
+                            Vector3 m = morro.Value;
+                            float r = new Vector2(x - m.x, z - m.z).magnitude * (0.85f + 0.3f * n1);
+                            float cono = m.y + 0.45f - 0.48f * r + terron * 0.08f;
+                            if (cono > altura)
+                            {
+                                altura = cono;
+                                tierra = 1f;
+                                vivo[k] = true;
+                            }
+                        }
                         vertices.Add(new Vector3(x, altura, z));
                         Color32 c = colores.En(x, z);
                         c.a = (byte)Mathf.RoundToInt(Mathf.Clamp01(tierra) * 255f);
