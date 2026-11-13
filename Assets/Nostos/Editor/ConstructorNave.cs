@@ -184,12 +184,12 @@ namespace Nostos.EditorTools
             // el surco se arrime a la forma real del casco.
             cuerpo.localRotation = Quaternion.Euler(casco.giroNaufragio);
             cuerpo.localPosition = Vector3.down * casco.hundimiento;
-            var nucleo = new List<GameObject>();
+            var piezasNucleo = new List<GameObject>();
             foreach (var p in piezas)
             {
-                if (p.tipo == "Core" && p.go != null) nucleo.Add(p.go);
+                if (p.tipo == "Core" && p.go != null) piezasNucleo.Add(p.go);
             }
-            PrepararCasco(nucleo);
+            PrepararCasco(piezasNucleo);
 
             // El surco y lo que quedó en él.
             var restos = new GameObject("Aterrizaje forzoso").transform;
