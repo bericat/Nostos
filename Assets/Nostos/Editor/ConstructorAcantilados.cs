@@ -16,8 +16,8 @@ namespace Nostos.EditorTools
     public static partial class ConstructorEscena
     {
         /// <summary>Una roca por celda de este lado (m) como mucho.</summary>
-        const float EspacioAcantilado = 7f;
-        const int MaximoAcantilados = 1400;
+        const float EspacioAcantilado = 11f;
+        const int MaximoAcantilados = 1000;
 
         static void AcantiladosDelValle()
         {
@@ -34,6 +34,7 @@ namespace Nostos.EditorTools
             Transform sueloT = valle != null ? BuscarHijo(valle.transform, "Suelo") : null;
             MeshFilter filtro = sueloT != null ? sueloT.GetComponent<MeshFilter>() : null;
             if (modelos.Count == 0 || filtro == null || filtro.sharedMesh == null || !File.Exists(ImportadorKit.RutaTextura)) return;
+            SuavizarMontanas(filtro);
 
             var paleta = new Texture2D(2, 2);
             paleta.LoadImage(File.ReadAllBytes(ImportadorKit.RutaTextura));
@@ -77,8 +78,8 @@ namespace Nostos.EditorTools
 
                 GameObject modelo = modelos[azar.Next(modelos.Count)];
                 var roca = (GameObject)PrefabUtility.InstantiatePrefab(modelo, raiz.transform);
-                float escala = Mathf.Lerp(1.4f, 2.6f, (float)azar.NextDouble());
-                if (centro.y > 60f) escala *= 1.4f;   // las cumbres, con bloques más grandes
+                float escala = Mathf.Lerp(2.6f, 4.6f, (float)azar.NextDouble());
+                if (centro.y > 60f) escala *= 1.3f;   // las cumbres, con bloques más grandes
                 roca.transform.localScale = Vector3.one * escala;
                 // Hacia fuera de la pared, con el arriba casi vertical y un poco de vaivén.
                 Vector3 fuera = new Vector3(normal.x, 0f, normal.z);
@@ -90,8 +91,9 @@ namespace Nostos.EditorTools
                 foreach (Collider col in roca.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(col);
                 // Medio metida en la pared: su centro detrás de la cara y un poco por debajo.
                 Bounds b = Medir(roca);
-                float hondo = Mathf.Min(b.extents.x, b.extents.z) * 0.55f;
-                roca.transform.position += centro - fuera * hondo - Vector3.up * b.extents.y * 0.25f - b.center;
+                // Bien metida (dos tercios dentro): asoma como un saliente de la pared, no pegada encima.
+                float hondo = Mathf.Min(b.extents.x, b.extents.z) * 0.75f;
+                roca.transform.position += centro - fuera * hondo - Vector3.up * b.extents.y * 0.35f - b.center;
                 foreach (Renderer r in roca.GetComponentsInChildren<Renderer>(true))
                 {
                     r.shadowCastingMode = escala > 2f ? ShadowCastingMode.On : ShadowCastingMode.Off;
@@ -101,6 +103,60 @@ namespace Nostos.EditorTools
                 puestas++;
             }
             Debug.Log("Nostos: " + puestas + " rocas de CliffStonePackM en las paredes de las montañas.");
+        }
+
+        /// <summary>
+        /// Las montañas con sombreado suave en vez de facetas: fuera del llano, cada vértice lleva la
+        /// media de las normales de las caras que lo tocan (por área). El llano sigue igual.
+        /// </summary>
+        static void SuavizarMontanas(MeshFilter filtro)
+        {
+            Mesh malla = filtro.sharedMesh;
+            string ruta = AssetDatabase.GetAssetPath(malla);
+            if (string.IsNullOrEmpty(ruta) || !ruta.EndsWith(".asset"))
+            {
+                malla = Object.Instantiate(malla);
+                malla.name = "Suelo del valle (montañas suaves)";
+                string nueva = CarpetaPrefabsPaquetes + "/suelo_suave.asset";
+                AssetDatabase.DeleteAsset(nueva);
+                AssetDatabase.CreateAsset(malla, nueva);
+                filtro.sharedMesh = malla;
+                var colision = filtro.GetComponent<MeshCollider>();
+                if (colision != null) colision.sharedMesh = malla;
+            }
+            Vector3[] v = malla.vertices;
+            Vector3[] normales = malla.normals;
+            int[] t = malla.triangles;
+            if (normales == null || normales.Length != v.Length) return;
+            var suma = new Dictionary<Vector3Int, Vector3>();
+            Vector3Int ClavePos(Vector3 p) => new Vector3Int(Mathf.RoundToInt(p.x * 200f), Mathf.RoundToInt(p.y * 200f), Mathf.RoundToInt(p.z * 200f));
+            for (int i = 0; i < t.Length; i += 3)
+            {
+                Vector3 a = v[t[i]], b = v[t[i + 1]], c = v[t[i + 2]];
+                Vector3 n = Vector3.Cross(b - a, c - a);   // largo = 2 × área
+                if (Vector3.Dot(n, normales[t[i]]) < 0f) n = -n;
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3Int q = ClavePos(v[t[i + k]]);
+                    suma[q] = suma.TryGetValue(q, out Vector3 s) ? s + n : n;
+                }
+            }
+            Matrix4x4 m = filtro.transform.localToWorldMatrix;
+            int cambiados = 0;
+            for (int i = 0; i < v.Length; i++)
+            {
+                Vector3 w = m.MultiplyPoint3x4(v[i]);
+                float r = new Vector2(w.x, w.z).magnitude;
+                if (r < 46f) continue;
+                Vector3 suave = suma[ClavePos(v[i])].normalized;
+                // Entre 46 y 52 m se pasa poco a poco de facetas a suave.
+                normales[i] = Vector3.Slerp(normales[i], suave, Mathf.Clamp01((r - 46f) / 6f));
+                cambiados++;
+            }
+            malla.normals = normales;
+            EditorUtility.SetDirty(malla);
+            AssetDatabase.SaveAssets();
+            Debug.Log("Nostos: montañas con sombreado suave (" + cambiados + " vértices).");
         }
 
         static long ClaveAcantilado(Vector3 p, float lado)

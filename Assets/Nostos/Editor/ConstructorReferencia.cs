@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
         const string CarpetaCliff = "Assets/Dzeruza/CliffStonePackM";
         const string CarpetaCliffURP = "Assets/Nostos/Prefabs/Paquetes/CliffStone";
         const string RutaComparacion = "Assets/Nostos/Escenas/Comparacion.unity";
-        const string VersionCapturas = "R4";
+        const string VersionCapturas = "R5";
         const string MarcaCapturas = "Library/NostosCapturas.txt";
         const string ClaveVolver = "Nostos.VolverAEscena";
         const string ClaveInicioCapturas = "Nostos.InicioCapturas";

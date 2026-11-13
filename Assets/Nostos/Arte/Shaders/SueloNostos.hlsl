@@ -158,8 +158,9 @@ float3 RocaN(float3 p, float3 cara, out float3 normal)
     // De barro a piedra: casi sin color y hacia el gris oliva, con dos tonos a manchas grandes.
     float luz = dot(c, float3(0.2126, 0.7152, 0.0722));
     float mancha = smoothstep(0.3, 0.7, RuidoN(p.xz * 0.02 + p.y * 0.01));
-    float3 piedra = lerp(ALinealN(float3(119, 121, 105) / 255.0), ALinealN(float3(149, 145, 126) / 255.0), mancha);
-    float3 color = piedra * (0.55 + 1.6 * luz) ;
+    // Los dos tonos de las rocas del paquete que hay en la pared (gris y marrón), algo más oscuros.
+    float3 piedra = lerp(ALinealN(float3(104, 108, 108) / 255.0), ALinealN(float3(128, 112, 96) / 255.0), mancha);
+    float3 color = piedra * (0.45 + 1.4 * luz);
     // Estratos: bandas horizontales que ondulan un poco.
     float estrato = RuidoN(float2(p.y * 0.55 + RuidoN(p.xz * 0.04) * 2.0, (p.x + p.z) * 0.03));
     color *= lerp(0.82, 1.12, estrato);
