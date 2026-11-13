@@ -118,6 +118,8 @@ float3 SueloN(float3 paleta, float2 xz, out float3 normalDetalle)
     // La hierba del paquete sale verde lima con nuestra luz: a un verde natural (biblia, #76A946),
     // y con manchas grandes más secas o más verdes, sin seguir las caras.
     hierba = TonoHierbaN(hierba);
+    // El barro con hierba también trae la hierba lima: el mismo verde, a medias.
+    barroHierba = lerp(barroHierba, TonoHierbaN(barroHierba) * 1.25, 0.7);
     float tono = RuidoN(xz * 0.035 + 3.0) * 0.7 + RuidoN(xz * 0.11 + 17.0) * 0.3;
     hierba *= lerp(float3(0.9, 1.0, 0.95), float3(1.08, 1.0, 0.85), smoothstep(0.3, 0.75, tono));
     float3 color = lerp(lerp(hierba, barroHierba, aBarroHierba), barro, aBarro);
