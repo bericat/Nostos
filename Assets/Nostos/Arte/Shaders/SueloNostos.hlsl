@@ -126,6 +126,44 @@ float3 SueloN(float3 paleta, float2 xz, out float3 normalDetalle)
     return lerp(ALinealN(paleta), color, suelo);
 }
 
+/// Cuánto de roca de montaña es un color de la paleta (sRGB).
+float EsRocaN(float3 paleta)
+{
+    return max(ParecidoN(paleta, float3(160, 142, 150) / 255.0), ParecidoN(paleta, float3(116, 102, 122) / 255.0));
+}
+
+#define TAM_ROCA 5.0
+
+/// La piedra de las paredes entre las rocas del paquete: triplanar con el barro del paquete
+/// pasado a piedra gris oliva (#777969 / #95917E de la biblia), con estratos horizontales.
+/// Devuelve el albedo lineal y deja en `normal` la normal del mundo con el detalle.
+float3 RocaN(float3 p, float3 cara, out float3 normal)
+{
+    float3 w = pow(abs(cara), 4.0);
+    w /= (w.x + w.y + w.z);
+    float2 uvX = p.zy / TAM_ROCA, uvY = p.xz / TAM_ROCA, uvZ = p.xy / TAM_ROCA;
+    float3 c = SAMPLE_TEXTURE2D(_Barro, sampler_Cesped, uvX).rgb * w.x
+             + SAMPLE_TEXTURE2D(_Barro, sampler_Cesped, uvY).rgb * w.y
+             + SAMPLE_TEXTURE2D(_Barro, sampler_Cesped, uvZ).rgb * w.z;
+    float3 tX = UnpackNormal(SAMPLE_TEXTURE2D(_BarroN, sampler_Cesped, uvX));
+    float3 tY = UnpackNormal(SAMPLE_TEXTURE2D(_BarroN, sampler_Cesped, uvY));
+    float3 tZ = UnpackNormal(SAMPLE_TEXTURE2D(_BarroN, sampler_Cesped, uvZ));
+    // Mezcla "whiteout" de las tres normales.
+    tX = float3(tX.xy + cara.zy, abs(tX.z) * cara.x);
+    tY = float3(tY.xy + cara.xz, abs(tY.z) * cara.y);
+    tZ = float3(tZ.xy + cara.xy, abs(tZ.z) * cara.z);
+    normal = normalize(tX.zyx * w.x + tY.xzy * w.y + tZ.xyz * w.z);
+    // De barro a piedra: casi sin color y hacia el gris oliva, con dos tonos a manchas grandes.
+    float luz = dot(c, float3(0.2126, 0.7152, 0.0722));
+    float mancha = smoothstep(0.3, 0.7, RuidoN(p.xz * 0.02 + p.y * 0.01));
+    float3 piedra = lerp(ALinealN(float3(119, 121, 105) / 255.0), ALinealN(float3(149, 145, 126) / 255.0), mancha);
+    float3 color = piedra * (0.55 + 1.6 * luz) ;
+    // Estratos: bandas horizontales que ondulan un poco.
+    float estrato = RuidoN(float2(p.y * 0.55 + RuidoN(p.xz * 0.04) * 2.0, (p.x + p.z) * 0.03));
+    color *= lerp(0.82, 1.12, estrato);
+    return color;
+}
+
 /// Albedo lineal del suelo (para lo que se funde con él: caminos, surco).
 float3 AlbedoSueloN(float3 paleta, float2 xz, float escala, float fuerza)
 {

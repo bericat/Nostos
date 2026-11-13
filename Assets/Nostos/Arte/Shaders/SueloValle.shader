@@ -75,8 +75,18 @@ Shader "Nostos/SueloValle" {
                 // La paleta es sRGB: se lee en lineal y se vuelve a sRGB para comparar colores.
                 float3 paleta = ASRGBN(SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb);
                 float3 detalle;
+                float3 cara = normalize(i.normalWS);
                 float3 albedo = SueloN(paleta, i.posWS.xz, detalle);
-                float3 n = NormalSueloN(normalize(i.normalWS), detalle);
+                float3 n = NormalSueloN(cara, detalle);
+                // Las paredes de las montañas, de piedra (entre las rocas de CliffStonePackM).
+                float roca = EsRocaN(paleta);
+                if (roca > 0.0)
+                {
+                    float3 nRoca;
+                    float3 piedra = RocaN(i.posWS, cara, nRoca);
+                    albedo = lerp(albedo, piedra, roca);
+                    n = normalize(lerp(n, nRoca, roca));
+                }
                 float3 color = IluminarN(albedo, n, i.posWS, i.posCS);
                 return half4(MixFog(color, i.niebla), 1);
             }

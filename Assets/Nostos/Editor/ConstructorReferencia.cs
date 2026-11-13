@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
         const string CarpetaCliff = "Assets/Dzeruza/CliffStonePackM";
         const string CarpetaCliffURP = "Assets/Nostos/Prefabs/Paquetes/CliffStone";
         const string RutaComparacion = "Assets/Nostos/Escenas/Comparacion.unity";
-        const string VersionCapturas = "R3";
+        const string VersionCapturas = "R4";
         const string MarcaCapturas = "Library/NostosCapturas.txt";
         const string ClaveVolver = "Nostos.VolverAEscena";
         const string ClaveInicioCapturas = "Nostos.InicioCapturas";
@@ -340,6 +340,20 @@ namespace Nostos.EditorTools
                 vistas.Add(Vista("7_fps_pueblo", ojoP, pl + Vector3.up * 2f, 70f));
                 vistas.Add(Iso("8_iso_pueblo", Vector3.Lerp(r, pl, 0.5f), 42f));
             }
+
+            // Las montañas: dos paredes desde el borde del llano y el valle entero desde arriba.
+            var montanas = new[]
+            {
+                ("9_fps_montana_oeste", new Vector3(-38f, 0f, 6f), new Vector3(-95f, 16f, 10f)),
+                ("10_fps_montana_este", new Vector3(38f, 0f, -4f), new Vector3(95f, 16f, -8f)),
+            };
+            foreach (var (nombre, desde, hacia) in montanas)
+            {
+                Vector3 ojoM = desde;
+                ojoM.y = Altura(suelo, desde) + Ojo;
+                vistas.Add(Vista(nombre, ojoM, hacia, 70f));
+            }
+            vistas.Add(Iso("11_iso_valle", Vector3.zero, 230f));
 
             var capturas = raiz.AddComponent<CapturasReferencia>();
             capturas.vistas = vistas.ToArray();

@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F19b-hierba";
+        const string Version = "F20-acantilados";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -1738,6 +1738,9 @@ namespace Nostos.EditorTools
             {
                 Veta(new Vector3(-7f, 0f, -9f), vetaMin, vetaMin + 0.2f);
             }
+
+            // Las paredes de las montañas con las rocas de CliffStonePackM.
+            AcantiladosDelValle();
 
             // Hierba densa por todo el valle (paquete "A piece of nature").
             SembrarHierba();
