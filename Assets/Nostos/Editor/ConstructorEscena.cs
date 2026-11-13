@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F16-herramientas";
+        const string Version = "F16b-cajas";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -1232,6 +1232,7 @@ namespace Nostos.EditorTools
             Barril(plaza, valle, c + new Vector3(4.2f, 0f, 2.4f), 20f);
             Barril(plaza, valle, c + new Vector3(4.9f, 0f, 1.5f), 75f, 0.9f);
             Barril(plaza, valle, c + new Vector3(-3.6f, 0f, -3.4f), 140f);
+            CajasDeLaPlaza(plaza, valle);
         }
 
         /// <summary>
@@ -1276,6 +1277,7 @@ namespace Nostos.EditorTools
                 Barril(t, valle, t.TransformPoint(new Vector3(-2.8f, 0f, -6.0f)), 30f);
                 Barril(t, valle, t.TransformPoint(new Vector3(-3.7f, 0f, -5.4f)), 100f, 0.9f);
                 Barril(t, valle, t.TransformPoint(new Vector3(5.6f, 0f, 1.2f)), 210f);
+                CajasDeLaPanaderia(t, valle);
                 libres.Add(new Vector3(x, 11f, z));
                 return;
             }

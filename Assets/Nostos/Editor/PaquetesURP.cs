@@ -22,6 +22,7 @@ namespace Nostos.EditorTools
             "Assets/Holy Assets Games/3D The Blacksmith's House",
             "Assets/RealisticMeshDeformation",
             "Assets/A_piece_of_nature",
+            "Assets/McSteeg/PSX Style Crates and Barrels Pack",
         };
 
         [MenuItem("Nostos/Pasar paquetes a URP")]
