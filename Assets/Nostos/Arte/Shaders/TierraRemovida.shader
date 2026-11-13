@@ -11,7 +11,13 @@ Shader "Nostos/TierraRemovida" {
         _ColorQuemado ("Quemado", Color) = (0.22,0.17,0.14,1)
         _Terrones ("Terrones en el borde", Range(1, 12)) = 5
         _Fondo ("Oscuro del fondo", Range(0, 1)) = 0.38
-        _Cesped ("Césped del suelo (Grass_texture_1)", 2D) = "white" {}
+        _Cesped ("Hierba del suelo (CSPM_Grass)", 2D) = "white" {}
+        [Normal] _CespedN ("Hierba, normal", 2D) = "bump" {}
+        _Barro ("Barro (CSPM_Mud)", 2D) = "white" {}
+        [Normal] _BarroN ("Barro, normal", 2D) = "bump" {}
+        _BarroHierba ("Barro con hierba (CSPM_GrassyMud)", 2D) = "white" {}
+        [Normal] _BarroHierbaN ("Barro con hierba, normal", 2D) = "bump" {}
+        [NoScaleOffset] _MapaSuelo ("Mapa del suelo", 2D) = "black" {}
         _EscalaCesped ("Repeticiones por metro", Float) = 0.22
         _FuerzaCesped ("Cuánto césped", Range(0, 1)) = 1
     }

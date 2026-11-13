@@ -1,12 +1,26 @@
-// Funciones comunes del suelo del valle (SueloValle, TierraRemovida, HierbaViento).
-// El terreno trae un color de paleta por cara; donde ese color es de hierba se pinta con el
-// césped del paquete "A piece of nature" (Grass_texture_1), tal cual, y el tono de la paleta
-// solo lo matiza (hierba seca más amarilla, hierba oscura más oscura).
+// Funciones comunes del suelo del valle (SueloValle, TierraRemovida, Camino, HierbaViento).
+// El terreno trae un color de paleta por cara. Lo que no es roca se pinta con las capas de terreno
+// de CliffStonePackM (la referencia de la biblia artística): hierba, barro con hierba y barro.
+// Dónde va el barro (caminos y orillas del valle) lo dice _MapaSuelo, un mapa visto desde arriba
+// hecho con esas caras y difuminado, con ruido: el borde no sigue los triángulos.
 #ifndef SUELO_NOSTOS_INCLUDED
 #define SUELO_NOSTOS_INCLUDED
 
 TEXTURE2D(_Cesped);
 SAMPLER(sampler_Cesped);
+TEXTURE2D(_CespedN);
+TEXTURE2D(_Barro);
+TEXTURE2D(_BarroN);
+TEXTURE2D(_BarroHierba);
+TEXTURE2D(_BarroHierbaN);
+TEXTURE2D(_MapaSuelo);
+SAMPLER(sampler_MapaSuelo);
+
+// Metros por repetición de cada capa y lado del mapa (el valle va de -200 a 200).
+#define TAM_HIERBA 3.2
+#define TAM_BARRO 2.8
+#define TAM_BARRO_HIERBA 3.4
+#define LADO_MAPA_SUELO 400.0
 
 float3 ALinealN(float3 c)
 {
@@ -34,22 +48,88 @@ float EsHierbaN(float3 paleta)
     return h;
 }
 
-/// Césped del paquete en el punto xz del mundo, con una segunda muestra girada para que no se
-/// note la repetición.
-float3 CespedN(float2 xz, float escala)
+float AzarN(float2 p)
 {
-    float3 a = SAMPLE_TEXTURE2D(_Cesped, sampler_Cesped, xz * escala).rgb;
-    float2 girado = float2(xz.x * 0.8 - xz.y * 0.6, xz.x * 0.6 + xz.y * 0.8);
-    float3 b = SAMPLE_TEXTURE2D(_Cesped, sampler_Cesped, girado * escala * 0.37 + 0.31).rgb;
-    return lerp(a, b, 0.35);
+    p = frac(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return frac(p.x * p.y);
 }
 
-/// Albedo lineal del suelo: la paleta, o el césped donde la paleta es hierba.
+float RuidoN(float2 p)
+{
+    float2 i = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    float a = AzarN(i), b = AzarN(i + float2(1, 0)), c = AzarN(i + float2(0, 1)), d = AzarN(i + float2(1, 1));
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+}
+
+/// Cuánto de tierra (camino, orilla) es un color de la paleta (sRGB).
+float EsTierraN(float3 paleta)
+{
+    return max(ParecidoN(paleta, float3(200, 168, 114) / 255.0), ParecidoN(paleta, float3(132, 104, 78) / 255.0));
+}
+
+/// Tierra en el punto (0 hierba, 1 barro), con el borde roto por ruido (igual que TierraEn en C#).
+float TierraEnN(float2 xz)
+{
+    float m = SAMPLE_TEXTURE2D_LOD(_MapaSuelo, sampler_MapaSuelo, xz / LADO_MAPA_SUELO + 0.5, 0).r;
+    float n = RuidoN(xz * 0.55) * 0.6 + RuidoN(xz * 1.7 + 13.0) * 0.3 + RuidoN(xz * 4.3 + 31.0) * 0.1;
+    return m + (n - 0.5) * 0.45;
+}
+
+/// Dos muestras (una girada y a otra escala) mezcladas con ruido, para que no se vea la repetición.
+/// Devuelve el color y deja la normal (en los ejes x/z del mundo) en `normal`.
+float3 CapaN(TEXTURE2D_PARAM(tex, smp), TEXTURE2D_PARAM(texN, smpN), float2 xz, float tam, float mezcla, out float3 normal)
+{
+    float2 uvA = xz / tam;
+    float2 girado = float2(xz.x * 0.8 - xz.y * 0.6, xz.x * 0.6 + xz.y * 0.8);
+    float2 uvB = girado / (tam * 1.37) + 0.37;
+    float3 a = SAMPLE_TEXTURE2D(tex, smp, uvA).rgb;
+    float3 b = SAMPLE_TEXTURE2D(tex, smp, uvB).rgb;
+    float3 na = UnpackNormal(SAMPLE_TEXTURE2D(texN, smpN, uvA));
+    float3 nb = UnpackNormal(SAMPLE_TEXTURE2D(texN, smpN, uvB));
+    // La muestra girada trae la normal en sus ejes: se devuelve a los del mundo.
+    nb.xy = float2(nb.x * 0.8 + nb.y * 0.6, -nb.x * 0.6 + nb.y * 0.8);
+    normal = normalize(lerp(na, nb, mezcla));
+    return lerp(a, b, mezcla);
+}
+
+/// El suelo en un punto: albedo lineal y normal de detalle (x y z del mundo en .xy, arriba en .z).
+/// Las caras de roca siguen con su color de paleta.
+float3 SueloN(float3 paleta, float2 xz, out float3 normalDetalle)
+{
+    float suelo = saturate(EsHierbaN(paleta) + EsTierraN(paleta));
+    float t = TierraEnN(xz);
+    float aBarroHierba = smoothstep(0.16, 0.42, t);
+    float aBarro = smoothstep(0.46, 0.7, t);
+    float mezcla = smoothstep(0.25, 0.75, RuidoN(xz * 0.13 + 7.0));
+    float3 nH, nBH, nB;
+    float3 hierba = CapaN(TEXTURE2D_ARGS(_Cesped, sampler_Cesped), TEXTURE2D_ARGS(_CespedN, sampler_Cesped), xz, TAM_HIERBA, mezcla, nH);
+    float3 barroHierba = CapaN(TEXTURE2D_ARGS(_BarroHierba, sampler_Cesped), TEXTURE2D_ARGS(_BarroHierbaN, sampler_Cesped), xz, TAM_BARRO_HIERBA, mezcla, nBH);
+    float3 barro = CapaN(TEXTURE2D_ARGS(_Barro, sampler_Cesped), TEXTURE2D_ARGS(_BarroN, sampler_Cesped), xz, TAM_BARRO, mezcla, nB);
+    // La hierba cambia de tono a manchas grandes (más seca o más verde), sin seguir las caras.
+    float tono = RuidoN(xz * 0.035 + 3.0) * 0.7 + RuidoN(xz * 0.11 + 17.0) * 0.3;
+    hierba *= lerp(float3(0.9, 1.0, 0.92), float3(1.1, 1.04, 0.84), smoothstep(0.3, 0.75, tono));
+    float3 color = lerp(lerp(hierba, barroHierba, aBarroHierba), barro, aBarro);
+    float3 n = normalize(lerp(lerp(nH, nBH, aBarroHierba), nB, aBarro));
+    normalDetalle = normalize(lerp(float3(0, 0, 1), n, suelo));
+    return lerp(ALinealN(paleta), color, suelo);
+}
+
+/// Albedo lineal del suelo (para lo que se funde con él: caminos, surco).
 float3 AlbedoSueloN(float3 paleta, float2 xz, float escala, float fuerza)
 {
-    float3 lin = ALinealN(paleta);
-    float3 tinte = lin / ALinealN(float3(150, 160, 74) / 255.0);
-    return lerp(lin, CespedN(xz, escala) * tinte, EsHierbaN(paleta) * fuerza);
+    float3 nada;
+    return lerp(ALinealN(paleta), SueloN(paleta, xz, nada), fuerza);
+}
+
+/// La normal de la cara con el detalle de la textura del suelo encima.
+float3 NormalSueloN(float3 cara, float3 detalle)
+{
+    float3 t = normalize(float3(1, 0, 0) - cara * cara.x);
+    float3 b = normalize(float3(0, 0, 1) - cara * cara.z);
+    return normalize(t * detalle.x + b * detalle.y + cara * detalle.z);
 }
 
 /// Luz difusa como la del terreno (URP Lit no metálico y mate): sol con sombras, luces

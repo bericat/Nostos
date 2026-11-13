@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F18-inventario";
+        const string Version = "F19-suelo";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -898,6 +898,9 @@ namespace Nostos.EditorTools
             material.shader = Shader.Find("Nostos/Camino");
             material.SetTexture("_BaseMap", piedra);
             material.mainTexture = piedra;
+            // La tierra del borde, el barro de CliffStonePackM (la misma familia que el suelo).
+            TerrainLayer barro = CapaCliff("_Mud");
+            if (barro != null && barro.diffuseTexture != null) tierra = barro.diffuseTexture as Texture2D ?? tierra;
             if (tierra != null) material.SetTexture("_Tierra", tierra);
             // El borde se funde en el césped pintado igual que el suelo del valle.
             var paleta = AssetDatabase.LoadAssetAtPath<Texture2D>(ImportadorKit.RutaTextura);

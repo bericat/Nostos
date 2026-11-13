@@ -1,9 +1,16 @@
-// El suelo del valle: colores de la paleta por cara (rocas, caminos, río) y, donde es hierba,
-// el césped pintado a mano del paquete "A piece of nature". Lo usa el objeto "Suelo" de valle.fbx.
+// El suelo del valle: las capas de terreno de CliffStonePackM (hierba, barro con hierba, barro)
+// donde no es roca, con los caminos y orillas sacados de _MapaSuelo; la roca, con su color de
+// paleta por cara. Lo usa el objeto "Suelo" de valle.fbx.
 Shader "Nostos/SueloValle" {
     Properties {
         [MainTexture] _BaseMap ("Paleta", 2D) = "white" {}
-        _Cesped ("Césped (Grass_texture_1)", 2D) = "white" {}
+        _Cesped ("Hierba (CSPM_Grass)", 2D) = "white" {}
+        [Normal] _CespedN ("Hierba, normal", 2D) = "bump" {}
+        _Barro ("Barro (CSPM_Mud)", 2D) = "white" {}
+        [Normal] _BarroN ("Barro, normal", 2D) = "bump" {}
+        _BarroHierba ("Barro con hierba (CSPM_GrassyMud)", 2D) = "white" {}
+        [Normal] _BarroHierbaN ("Barro con hierba, normal", 2D) = "bump" {}
+        [NoScaleOffset] _MapaSuelo ("Mapa del suelo (R tierra, G roca)", 2D) = "black" {}
         _EscalaCesped ("Repeticiones por metro", Float) = 0.22
         _FuerzaCesped ("Cuánto césped", Range(0, 1)) = 1
     }
@@ -67,8 +74,10 @@ Shader "Nostos/SueloValle" {
             {
                 // La paleta es sRGB: se lee en lineal y se vuelve a sRGB para comparar colores.
                 float3 paleta = ASRGBN(SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).rgb);
-                float3 albedo = AlbedoSueloN(paleta, i.posWS.xz, _EscalaCesped, _FuerzaCesped);
-                float3 color = IluminarN(albedo, normalize(i.normalWS), i.posWS, i.posCS);
+                float3 detalle;
+                float3 albedo = SueloN(paleta, i.posWS.xz, detalle);
+                float3 n = NormalSueloN(normalize(i.normalWS), detalle);
+                float3 color = IluminarN(albedo, n, i.posWS, i.posCS);
                 return half4(MixFog(color, i.niebla), 1);
             }
             ENDHLSL

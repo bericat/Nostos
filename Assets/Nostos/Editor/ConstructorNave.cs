@@ -352,6 +352,9 @@ namespace Nostos.EditorTools
             var render = go.AddComponent<MeshRenderer>();
             Material material = CargarOCrear("Surco", "Nostos/TierraRemovida");
             var tierra = AssetDatabase.LoadAssetAtPath<Texture2D>(CarpetaTexturasPaquete + "Summer_Dirt_A.png");
+            // El barro de CliffStonePackM: la misma familia que el suelo y los caminos.
+            TerrainLayer barro = CapaCliff("_Mud");
+            if (barro != null && barro.diffuseTexture is Texture2D barroTex) tierra = barroTex;
             if (tierra != null)
             {
                 material.SetTexture("_BaseMap", tierra);

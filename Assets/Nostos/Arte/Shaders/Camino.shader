@@ -1,5 +1,5 @@
 // Caminos que traza el jugador: el empedrado de la plaza (Summer_Rocks del "Lowpoly Textures
-// Pack"), con el borde roto. Cada vértice lleva en uv.x cuánto está dentro del camino (metros:
+// Pack"), con el borde roto y la tierra del borde con el barro de CliffStonePackM. Cada vértice lleva en uv.x cuánto está dentro del camino (metros:
 // positivo dentro, negativo fuera); con ruido en el mundo, el borde se come la hierba en unos
 // sitios y la hierba se mete en el camino en otros. Junto al borde las piedras se hunden en
 // tierra (Summer_Dirt_A) y la tierra se pierde poco a poco en el césped, que se pinta igual que el
@@ -15,7 +15,13 @@ Shader "Nostos/Camino" {
         _AnchoTierra ("Franja de tierra junto al borde (m)", Range(0, 1)) = 0.35
         _FundidoHierba ("Fundido de la tierra en la hierba (m)", Range(0.1, 1.2)) = 0.6
         _Paleta ("Paleta del suelo", 2D) = "white" {}
-        _Cesped ("Césped (Grass_texture_1)", 2D) = "white" {}
+        _Cesped ("Hierba del suelo (CSPM_Grass)", 2D) = "white" {}
+        [Normal] _CespedN ("Hierba, normal", 2D) = "bump" {}
+        _Barro ("Barro (CSPM_Mud)", 2D) = "white" {}
+        [Normal] _BarroN ("Barro, normal", 2D) = "bump" {}
+        _BarroHierba ("Barro con hierba (CSPM_GrassyMud)", 2D) = "white" {}
+        [Normal] _BarroHierbaN ("Barro con hierba, normal", 2D) = "bump" {}
+        [NoScaleOffset] _MapaSuelo ("Mapa del suelo", 2D) = "black" {}
         _EscalaCesped ("Repeticiones del césped por metro", Float) = 0.22
         _FuerzaCesped ("Cuánto césped", Range(0, 1)) = 1
     }
@@ -126,7 +132,8 @@ Shader "Nostos/Camino" {
                 float3 tierra = SAMPLE_TEXTURE2D(_Tierra, sampler_Tierra, girado / _MetrosTierra).rgb;
                 // El suelo del valle tal cual: paleta de la cara de debajo y césped donde es hierba.
                 float3 paleta = ASRGBN(SAMPLE_TEXTURE2D(_Paleta, sampler_Paleta, i.uvPaleta).rgb);
-                float3 hierba = AlbedoSueloN(paleta, xz, _EscalaCesped, _FuerzaCesped);
+                float3 detalle;
+                float3 hierba = SueloN(paleta, xz, detalle);
 
                 // Dentro: piedras. Hacia el borde se hunden en tierra a trozos (las sueltas primero).
                 float suelta = RuidoC(xz * 3.7 + 7.0);
@@ -138,7 +145,9 @@ Shader "Nostos/Camino" {
                 float aHierba = smoothstep(0.05, -_FundidoHierba, borde + (matas - 0.5) * 0.45);
                 albedo = lerp(albedo, hierba, saturate(aHierba));
 
-                float3 color = IluminarN(albedo, normalize(i.normalWS), i.posWS, i.posCS);
+                float3 cara = normalize(i.normalWS);
+                float3 n = normalize(lerp(cara, NormalSueloN(cara, detalle), saturate(aHierba)));
+                float3 color = IluminarN(albedo, n, i.posWS, i.posCS);
                 return half4(MixFog(color, i.niebla), 1);
             }
             ENDHLSL

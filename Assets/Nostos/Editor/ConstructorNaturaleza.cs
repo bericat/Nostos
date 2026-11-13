@@ -70,6 +70,8 @@ namespace Nostos.EditorTools
             material.shader = shader;
             material.SetTexture("_BaseMap", paleta);
             material.SetTexture("_Cesped", cesped);
+            // Las capas de terreno de CliffStonePackM y el mapa de caminos, si está el paquete.
+            TexturasSuelo(material);
             EditorUtility.SetDirty(material);
             return material;
         }
@@ -80,6 +82,7 @@ namespace Nostos.EditorTools
             Texture2D cesped = BuscarTextura(TexturaCesped);
             if (material == null || cesped == null || !material.HasProperty("_Cesped")) return;
             material.SetTexture("_Cesped", cesped);
+            TexturasSuelo(material);
             EditorUtility.SetDirty(material);
         }
 
@@ -96,6 +99,7 @@ namespace Nostos.EditorTools
             }
             PrepararTexturaMata(textura);
 
+            MapaSuelo();
             var suelo = new SueloIndexado();
             if (!suelo.Valido)
             {
@@ -120,6 +124,8 @@ namespace Nostos.EditorTools
                     if (px * px + pz * pz > RadioHierba * RadioHierba) continue;
                     if (!suelo.Muestra(px, pz, out float py, out float hierba, out float normalY)) continue;
                     if (hierba < 0.5f || normalY < 0.82f) continue;
+                    // Ni en los caminos ni en su borde de barro con hierba (el mismo borde que pinta el suelo).
+                    if (TierraEn(px, pz) > 0.2f) continue;
                     if (Ocupado(px, pz)) continue;
                     // Manchas más ralas aquí y allá, para que no parezca una alfombra.
                     float claros = Mathf.PerlinNoise(px * 0.07f + 13f, pz * 0.07f + 5f);
