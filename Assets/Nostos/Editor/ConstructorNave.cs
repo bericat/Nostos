@@ -180,9 +180,28 @@ namespace Nostos.EditorTools
             casco.giroNaufragio = new Vector3(6f, 0f, -11f);
             casco.hundimiento = 0.5f;
 
+            // La nave ya en su postura de naufragio (CascoNave la mantiene igual al jugar), para que
+            // el surco se arrime a la forma real del casco.
+            cuerpo.localRotation = Quaternion.Euler(casco.giroNaufragio);
+            cuerpo.localPosition = Vector3.down * casco.hundimiento;
+            var nucleo = new List<GameObject>();
+            foreach (var p in piezas)
+            {
+                if (p.tipo == "Core" && p.go != null) nucleo.Add(p.go);
+            }
+            PrepararCasco(nucleo);
+
             // El surco y lo que quedó en él.
             var restos = new GameObject("Aterrizaje forzoso").transform;
-            Surco surco = SurcoDelAterrizaje(valle, centro, rumbo, restos);
+            Surco surco;
+            try
+            {
+                surco = SurcoDelAterrizaje(valle, centro, rumbo, restos);
+            }
+            finally
+            {
+                QuitarCasco();
+            }
             casco.restos = TirarPiezas(valle, surco, restos, escala, pintura);
 
             // Humo y fuego: del hueco de los motores y de la tierra quemada.
@@ -225,9 +244,9 @@ namespace Nostos.EditorTools
         }
 
         /// <summary>
-        /// Copia del material del paquete con el desgaste subido: la nave llega castigada. El
-        /// shader "Colorize" del paquete trae propiedades de desgaste (Wearout); si cambian de
-        /// nombre, se queda como el original.
+        /// Copia del material del paquete con la suciedad y el desgaste subidos (_Dirty del shader
+        /// "Colorize" del paquete): la nave llega castigada. Si la propiedad cambia de nombre, se
+        /// queda como el original.
         /// </summary>
         static Material MaterialNave()
         {
@@ -241,8 +260,9 @@ namespace Nostos.EditorTools
                 string nombre = shader.GetPropertyName(i);
                 ShaderPropertyType tipo = shader.GetPropertyType(i);
                 propiedades.Add(nombre + " (" + tipo + ")");
-                if (nombre.IndexOf("wear", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                // En el shader del paquete el desgaste es una textura (_Wearout) que regula _Dirty.
                 if (tipo != ShaderPropertyType.Range) continue;
+                if (nombre != "_Dirty" && nombre.IndexOf("wear", System.StringComparison.OrdinalIgnoreCase) < 0) continue;
                 Vector2 limites = shader.GetPropertyRangeLimits(i);
                 material.SetFloat(nombre, Mathf.Lerp(material.GetFloat(nombre), limites.y, 0.7f));
             }
@@ -361,7 +381,8 @@ namespace Nostos.EditorTools
             List<Vector3> vertices, List<Color32> colorV, List<Vector2> uv, List<Vector2> quemado, List<int> triangulos)
         {
             const int Lados = 22;
-            float metros = (t1 - t0) * surco.largo + (empuje ? 3.2f : 0f);
+            const float Empuje = 4.5f;  // metros de montón por delante del final del surco
+            float metros = (t1 - t0) * surco.largo + (empuje ? Empuje : 0f);
             int pasos = Mathf.Max(8, Mathf.CeilToInt(metros / 0.45f));
             int base0 = vertices.Count;
             Vector3 avance = (surco.fin - surco.inicio).normalized;
@@ -370,15 +391,20 @@ namespace Nostos.EditorTools
                 float d = i / (float)pasos * metros;                    // metros desde el principio del tramo
                 float t = t0 + Mathf.Min(d, (t1 - t0) * surco.largo) / surco.largo;
                 float pasado = Mathf.Max(0f, d - (t1 - t0) * surco.largo); // metros más allá del final (montón)
-                float e = empuje ? Mathf.Clamp01(pasado / 3.2f) : 0f;
+                float e = empuje ? Mathf.Clamp01(pasado / Empuje) : 0f;
                 float k = (t - t0) / Mathf.Max(0.001f, t1 - t0);        // 0..1 dentro del tramo
                 float w = surco.Ancho(t);
                 // Los extremos se cierran redondeados.
                 float cierreInicio = Mathf.Sqrt(Mathf.Clamp01(d / Mathf.Min(1.4f, metros * 0.3f)));
-                float cierreFinal = empuje ? Mathf.Sqrt(Mathf.Max(0.04f, 1f - e * e)) : Mathf.Sqrt(Mathf.Clamp01((metros - d) / Mathf.Min(1.4f, metros * 0.3f)));
+                float cierreFinal = empuje ? Mathf.Sqrt(Mathf.Max(0.12f, 1f - e * e * 0.9f)) : Mathf.Sqrt(Mathf.Clamp01((metros - d) / Mathf.Min(1.4f, metros * 0.3f)));
                 float cierre = Mathf.Max(0.05f, Mathf.Min(cierreInicio, cierreFinal));
-                float cordon = (empuje ? Mathf.Lerp(0.3f, 0.85f, k) : Mathf.Lerp(0.12f, 0.3f, Mathf.Sin(k * Mathf.PI))) * Mathf.Lerp(0.6f, 1f, cierre);
-                float monton = empuje ? Mathf.Sin(e * Mathf.PI * 0.85f) * 1.3f + e * 0.3f : 0f;
+                // Toda la altura baja a cero en los extremos del tramo: nada de paredes cortadas.
+                float alturaInicio = Mathf.SmoothStep(0f, 1f, d / 1.6f);
+                float alturaFinal = empuje ? 1f - Mathf.SmoothStep(0.55f, 1f, e) : Mathf.SmoothStep(0f, 1f, (metros - d) / 1.6f);
+                float altura = Mathf.Min(alturaInicio, alturaFinal);
+                float cordon = (empuje ? Mathf.Lerp(0.3f, 0.85f, k) : Mathf.Lerp(0.12f, 0.3f, Mathf.Sin(k * Mathf.PI))) * altura;
+                // El montón que la nave empujó por delante: sube y vuelve a bajar hasta el suelo.
+                float monton = empuje ? Mathf.Sin(Mathf.Clamp01(e * 1.15f) * Mathf.PI) * 1.2f : 0f;
                 Vector3 eje = surco.Punto(t, 0f, true) + avance * pasado;
                 float quema = empuje ? Mathf.SmoothStep(0f, 1f, (k - 0.55f) / 0.45f) : Mathf.Clamp01(1f - k * 1.6f) * 0.8f;
 
@@ -417,8 +443,9 @@ namespace Nostos.EditorTools
                         tierra = 1f - Mathf.SmoothStep(0f, 1f, (s - 0.35f) / 0.65f);
                         fondo = 0f;
                     }
-                    y = Mathf.Max(y, 0f) + monton * (1f - Mathf.Clamp01(a / Mathf.Max(0.01f, radio)) * 0.9f);
-                    if (j == 0 || j == Lados)
+                    float haciaFuera = Mathf.Clamp01(a / Mathf.Max(0.01f, radio));
+                    y = Mathf.Max(y, 0f) * Mathf.Max(altura, monton > 0f ? 1f : 0f) + monton * Mathf.Pow(1f - haciaFuera * haciaFuera, 1.5f);
+                    if (j == 0 || j == Lados || i == 0 || i == pasos)
                     {
                         y = 0f;
                         tierra = 0f;
@@ -428,7 +455,17 @@ namespace Nostos.EditorTools
                     float suelo = valle.Altura(p.x, p.z);
                     // Fuera del llano el terreno real hace facetas: un poco más alto para no hundirse.
                     float margen = p.magnitude > 44f ? 0.07f : 0.015f;
-                    vertices.Add(new Vector3(p.x, suelo + margen + y, p.z));
+                    float alto = suelo + margen + y;
+                    // Bajo la nave y a su lado, la tierra sube hasta tocar el casco: sin huecos.
+                    if (j != 0 && j != Lados && i != 0 && i != pasos && Arrimar(p.x, p.z, out float casco))
+                    {
+                        if (casco > alto)
+                        {
+                            alto = casco;
+                            tierra = 1f;
+                        }
+                    }
+                    vertices.Add(new Vector3(p.x, alto, p.z));
                     Color32 c = colores.En(p.x, p.z);
                     c.a = (byte)Mathf.RoundToInt(Mathf.Clamp01(tierra) * 255f);
                     colorV.Add(c);
@@ -451,6 +488,82 @@ namespace Nostos.EditorTools
                     triangulos.Add(b); triangulos.Add(c); triangulos.Add(d);
                 }
             }
+        }
+
+        /// <summary>Colisionadores provisionales con la forma exacta del casco, para arrimarle la tierra.</summary>
+        static readonly List<MeshCollider> cascoProvisional = new List<MeshCollider>();
+        static Bounds zonaCasco;
+
+        /// <summary>Pone colisionadores con las mallas visibles del núcleo (lo que se ve al empezar).</summary>
+        static void PrepararCasco(IEnumerable<GameObject> nucleo)
+        {
+            QuitarCasco();
+            bool hay = false;
+            foreach (GameObject pieza in nucleo)
+            {
+                foreach (MeshFilter filtro in pieza.GetComponentsInChildren<MeshFilter>())
+                {
+                    if (filtro.sharedMesh == null || filtro.GetComponent<Renderer>() == null) continue;
+                    var mc = filtro.gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = filtro.sharedMesh;
+                    cascoProvisional.Add(mc);
+                    Bounds b = filtro.GetComponent<Renderer>().bounds;
+                    if (!hay) zonaCasco = b;
+                    else zonaCasco.Encapsulate(b);
+                    hay = true;
+                }
+            }
+            zonaCasco.Expand(new Vector3(4f, 0f, 4f));
+            Physics.SyncTransforms();
+        }
+
+        static void QuitarCasco()
+        {
+            foreach (MeshCollider mc in cascoProvisional)
+            {
+                if (mc != null) Object.DestroyImmediate(mc);
+            }
+            cascoProvisional.Clear();
+        }
+
+        /// <summary>
+        /// Altura a la que llega la tierra arrimada al casco en (x, z): debajo, justo hasta tocarlo;
+        /// alrededor, en talud (unos 40°) desde la parte baja del casco. False si el casco queda lejos.
+        /// </summary>
+        static bool Arrimar(float x, float z, out float altura)
+        {
+            altura = float.MinValue;
+            if (cascoProvisional.Count == 0) return false;
+            if (x < zonaCasco.min.x || x > zonaCasco.max.x || z < zonaCasco.min.z || z > zonaCasco.max.z) return false;
+            const float Talud = 0.85f;
+            bool toca = false;
+            for (int anillo = 0; anillo <= 3; anillo++)
+            {
+                float r = anillo * 0.5f;
+                int pasos = anillo == 0 ? 1 : 8;
+                for (int k = 0; k < pasos; k++)
+                {
+                    float ang = k * Mathf.PI * 2f / pasos;
+                    float h = BajoDelCasco(x + Mathf.Cos(ang) * r, z + Mathf.Sin(ang) * r);
+                    if (float.IsNaN(h)) continue;
+                    altura = Mathf.Max(altura, h + 0.12f - Talud * r);
+                    toca = true;
+                }
+            }
+            return toca;
+        }
+
+        /// <summary>Altura de la panza del casco en (x, z), mirando desde abajo; NaN si no hay casco.</summary>
+        static float BajoDelCasco(float x, float z)
+        {
+            var rayo = new Ray(new Vector3(x, zonaCasco.min.y - 3f, z), Vector3.up);
+            float mejor = float.NaN;
+            foreach (MeshCollider mc in cascoProvisional)
+            {
+                if (mc == null || !mc.Raycast(rayo, out RaycastHit golpe, zonaCasco.size.y + 6f)) continue;
+                if (float.IsNaN(mejor) || golpe.point.y < mejor) mejor = golpe.point.y;
+            }
+            return mejor;
         }
 
         /// <summary>
