@@ -18,13 +18,14 @@ namespace Nostos
         public ColocadorRejilla colocador;
         public Camera camara;
         public MenuPausa pausa;
+        public Inventario inventario;
         public float distanciaEtiquetasAPie = 30f;
 
         const float Margen = 16f;
         const float AnchoLateral = 360f;
         const float DistanciaColonos = 20f;
 
-        bool ayudaVisible = true;
+        bool ayudaVisible;
         string avisoTexto;
         float avisoDesde;
         float avisoHasta;
@@ -66,9 +67,7 @@ namespace Nostos
             if (!final)
             {
                 Etiquetas(aPie);
-                float y = FichaNicias(mundo, aPie);
-                float ym = Mochila(mundo.Mochila, y + 8f);
-                EquipoNicias(mundo.Equipo, ym + 6f);
+                FichaNicias(mundo, aPie);
                 float yd = BarraRecursos(mundo);
                 yd = Minimapa(mundo, aPie, yd + 16f);
                 Objetivo(mundo, yd + 10f);
@@ -106,69 +105,57 @@ namespace Nostos
         }
 
         /// <summary>
-        /// Arriba a la izquierda: el retrato de Nicias rodeado de 24 puntos (las horas del día),
-        /// el día y la hora, la carga de la mochila y la confianza del pueblo. Debajo, el modo.
-        /// Devuelve dónde acaba.
+        /// Arriba a la izquierda, en una sola tira discreta: sol o luna con el día y la hora, la
+        /// carga de la mochila y la confianza del pueblo. Debajo, el modo. Sin retrato: el
+        /// inventario completo está en su propia pantalla. Devuelve dónde acaba.
         /// </summary>
         float FichaNicias(Mundo mundo, bool aPie)
         {
-            var panel = new Rect(Margen, Margen, 352f, 108f);
-            Tema.Panel(panel);
-            var centro = new Vector2(panel.x + 58f, panel.center.y);
             float hora = juego.HoraSuave;
             bool deNoche = hora >= 20f || hora < 6f;
-            Tema.Relleno(new Rect(centro.x - 47f, centro.y - 47f, 94f, 94f), Tema.FondoHueco, 47f);
-            Tema.AnilloDePuntos(centro, 44f, 24, hora / 24f, 4.5f, deNoche ? Tema.Azul : Tema.Ocre,
-                new Color(Tema.Apagado.r, Tema.Apagado.g, Tema.Apagado.b, 0.25f));
-            var retrato = new Rect(centro.x - 37f, centro.y - 37f, 74f, 74f);
-            if (Tema.Imagen("Retratos/nicias_medallon") != null) Tema.Dibujar(retrato, "Retratos/nicias_medallon", Color.white);
-            else Tema.Relleno(retrato, Tema.Cobre, 37f);
-            Tema.Filo(new Rect(retrato.x - 1f, retrato.y - 1f, retrato.width + 2f, retrato.height + 2f), Tema.Borde, 2f, 38f);
-            // Sol o luna sobre el anillo, en la hora que es.
-            float a = hora / 24f * Mathf.PI * 2f - Mathf.PI * 0.5f;
-            var astro = new Rect(centro.x + Mathf.Cos(a) * 44f - 10f, centro.y + Mathf.Sin(a) * 44f - 10f, 20f, 20f);
-            Tema.Icono(astro, deNoche ? Tema.Simbolo.Luna : Tema.Simbolo.Sol);
-
-            float x = panel.x + 118f;
-            float w = panel.xMax - 14f - x;
-            Tema.Escribir(new Rect(x, panel.y + 8f, 120f, 26f), "Nicias", Tema.Titulo);
             int h = Mathf.FloorToInt(hora);
             int m = Mathf.FloorToInt((hora - h) * 60f);
-            string linea = "Día " + mundo.Ciclo.Dia + " · " + h.ToString("00") + ":" + m.ToString("00") + " · " + Momento(hora);
-            if (mundo.Ciclo.PuedeDormir) linea += " · a dormir";
-            Tema.Escribir(new Rect(x, panel.y + 36f, w, 20f), linea, Tema.Pequeno);
+            string cuando = "Día " + mundo.Ciclo.Dia + "  " + h.ToString("00") + ":" + m.ToString("00");
+            if (mundo.Ciclo.PuedeDormir) cuando += " · a dormir";
 
             Bolsa mochila = mundo.Mochila;
             bool llena = mochila.Capacidad > 0 && mochila.Total >= mochila.Capacidad;
-            float carga = mochila.Capacidad > 0 ? mochila.Total / (float)mochila.Capacidad : 0f;
-            Tema.Icono(new Rect(x - 2f, panel.y + 58f, 20f, 20f), Tema.Simbolo.Mochila);
-            Tema.Barra(new Rect(x + 24f, panel.y + 65f, w - 72f, 7f), carga, llena ? Tema.Rojo : Tema.Ocre);
-            string cuenta = mochila.Total + "/" + mochila.Capacidad;
-            Tema.Escribir(new Rect(x + w - 44f, panel.y + 57f, 46f, 22f), cuenta, Tema.Cifra, llena ? Tema.Rojo : Tema.Pergamino);
+            string carga = mochila.Total + "/" + mochila.Capacidad;
+            bool hayColonos = mundo.Colonos.Colonos.Count > 0;
+            float confianza = hayColonos ? mundo.Colonos.ConfianzaGlobal : 0f;
+            string textoConfianza = Mathf.RoundToInt(confianza).ToString();
 
-            if (mundo.Colonos.Colonos.Count > 0)
+            float wCuando = Tema.AnchoDe(cuando, Tema.Pequeno);
+            float wCarga = Tema.AnchoDe(carga, Tema.Pequeno);
+            float wConfianza = hayColonos ? Tema.AnchoDe(textoConfianza, Tema.Pequeno) + 34f : 0f;
+            float ancho = 14f + 22f + 8f + wCuando + 18f + 22f + 6f + wCarga + 14f + wConfianza;
+            var tira = new Rect(Margen, Margen, ancho, 34f);
+            Tema.Relleno(tira, new Color(Tema.Fondo.r, Tema.Fondo.g, Tema.Fondo.b, 0.62f), 17f);
+
+            float x = tira.x + 14f;
+            Tema.Icono(new Rect(x, tira.y + 6f, 22f, 22f), deNoche ? Tema.Simbolo.Luna : Tema.Simbolo.Sol);
+            x += 30f;
+            Tema.Escribir(new Rect(x, tira.y, wCuando + 2f, tira.height), cuando, Tema.Pequeno);
+            x += wCuando + 18f;
+            Tema.Icono(new Rect(x, tira.y + 6f, 22f, 22f), Tema.Simbolo.Mochila);
+            x += 28f;
+            Tema.Escribir(new Rect(x, tira.y, wCarga + 2f, tira.height), carga, Tema.Pequeno, llena ? Tema.Rojo : Tema.Pergamino);
+            x += wCarga + 14f;
+            if (hayColonos)
             {
-                float confianza = mundo.Colonos.ConfianzaGlobal;
-                Tema.Icono(new Rect(x - 2f, panel.y + 81f, 20f, 20f), Tema.Simbolo.Confianza);
-                Tema.Barra(new Rect(x + 24f, panel.y + 88f, w - 72f, 7f), confianza / 100f, ColorConfianza(confianza),
-                    GestorColonos.UmbralMedia / 100f, GestorColonos.UmbralAlta / 100f);
-                Tema.Escribir(new Rect(x + w - 44f, panel.y + 80f, 46f, 22f), Mathf.RoundToInt(confianza).ToString(), Tema.Cifra);
-            }
-            else
-            {
-                Tema.Escribir(new Rect(x, panel.y + 80f, w, 20f), "Ingeniero de Calcis", Tema.Pequeno, new Color(Tema.Apagado.r, Tema.Apagado.g, Tema.Apagado.b, 0.7f));
+                Tema.Icono(new Rect(x, tira.y + 6f, 22f, 22f), Tema.Simbolo.Confianza);
+                Tema.Escribir(new Rect(x + 28f, tira.y, wConfianza, tira.height), textoConfianza, Tema.Pequeno, ColorConfianza(confianza));
             }
 
-            // Chapa del modo, con la tecla para cambiar.
-            string modo = (aPie ? "A pie" : "Constructor").ToUpperInvariant();
+            // El modo, pequeño, con la tecla para cambiar.
+            string modo = aPie ? "A pie" : "Constructor";
             string otro = aPie ? "constructor" : "a pie";
-            float anchoModo = Tema.AnchoDe(modo, Tema.Seccion);
-            float ancho = 46f + anchoModo + 14f + Tema.AnchoIndicacion(Boton.Modo, otro, Tema.Pequeno);
-            var chapa = new Rect(Margen, panel.yMax + 8f, ancho, 34f);
-            Tema.Ficha(chapa);
-            Tema.Linea(new Rect(chapa.x + 12f, chapa.y + 7f, 20f, 20f), aPie ? "apie" : "construir", Tema.Ocre);
-            Tema.Escribir(new Rect(chapa.x + 40f, chapa.y, anchoModo + 2f, chapa.height), modo, Tema.Seccion);
-            Tema.Indicacion(chapa.x + 40f + anchoModo + 14f, chapa.center.y, Boton.Modo, otro, Tema.Pequeno);
+            float anchoModo = Tema.AnchoDe(modo, Tema.Pequeno);
+            float anchoChapa = 14f + anchoModo + 12f + Tema.AnchoIndicacion(Boton.Modo, otro, Tema.Pequeno) + 12f;
+            var chapa = new Rect(Margen, tira.yMax + 6f, anchoChapa, 28f);
+            Tema.Relleno(chapa, new Color(Tema.Fondo.r, Tema.Fondo.g, Tema.Fondo.b, 0.5f), 14f);
+            Tema.Escribir(new Rect(chapa.x + 14f, chapa.y, anchoModo + 2f, chapa.height), modo, Tema.Pequeno, Tema.Ocre);
+            Tema.Indicacion(chapa.x + 14f + anchoModo + 12f, chapa.center.y, Boton.Modo, otro, Tema.Pequeno);
             return chapa.yMax;
         }
 
@@ -473,14 +460,15 @@ namespace Nostos
 
         void Botones(bool aPie)
         {
-            const float lado = 54f;
-            const float hueco = 14f;
+            const float lado = 46f;
+            const float hueco = 12f;
             var lista = new System.Collections.Generic.List<(string icono, Boton boton, int accion)>
             {
                 (aPie ? "construir" : "apie", Boton.Modo, 0),
-                ("ayuda", Boton.Ayuda, 1),
-                ("menu", Boton.Pausa, 2)
             };
+            if (aPie) lista.Add(("mochila", Boton.Inventario, 3));
+            lista.Add(("ayuda", Boton.Ayuda, 1));
+            lista.Add(("menu", Boton.Pausa, 2));
             float x = Tema.Ancho - Margen - lista.Count * lado - (lista.Count - 1) * hueco;
             float y = Tema.Alto - Margen - lado - 22f;
             foreach (var b in lista)
@@ -491,7 +479,8 @@ namespace Nostos
                 Tema.Relleno(r, encima ? new Color32(88, 66, 46, 245) : Tema.Fondo, lado * 0.5f);
                 Tema.Filo(r, new Color(Tema.Borde.r, Tema.Borde.g, Tema.Borde.b, 0.8f), 1.5f, lado * 0.5f);
                 Tema.Filo(new Rect(r.x + 4f, r.y + 4f, r.width - 8f, r.height - 8f), new Color(Tema.Borde.r, Tema.Borde.g, Tema.Borde.b, 0.25f), 1f, lado * 0.5f - 4f);
-                Tema.Linea(new Rect(r.x + 14f, r.y + 14f, lado - 28f, lado - 28f), b.icono, Tema.Pergamino);
+                if (b.accion == 3) Tema.Icono(new Rect(r.x + 10f, r.y + 10f, lado - 20f, lado - 20f), Tema.Simbolo.Mochila);
+                else Tema.Linea(new Rect(r.x + 12f, r.y + 12f, lado - 24f, lado - 24f), b.icono, Tema.Pergamino);
                 float wk = Tema.AnchoTecla(b.boton);
                 Tema.DibujarTecla(r.center.x - wk * 0.5f, r.yMax + 12f, b.boton);
                 if (!aPie && GUI.Button(r, GUIContent.none, GUIStyle.none) && !control.Bloqueado)

@@ -45,6 +45,32 @@ namespace Nostos.EditorTools
             return filaFuego;
         }
 
+        /// <summary>Coordenada de paleta (columna 3, la del color exacto) del color más parecido a `c`.</summary>
+        static Vector2 UvPaleta(Color32 c)
+        {
+            if (!File.Exists(ImportadorKit.RutaTextura)) return new Vector2(0.4375f, 0.5f);
+            var paleta = new Texture2D(2, 2);
+            paleta.LoadImage(File.ReadAllBytes(ImportadorKit.RutaTextura));
+            int ancho = paleta.width, alto = paleta.height;
+            int lado = Mathf.Max(1, ancho / 8);
+            int filas = alto / lado;
+            Color32[] pixeles = paleta.GetPixels32();
+            Object.DestroyImmediate(paleta);
+            int mejor = 0, menor = int.MaxValue;
+            for (int fila = 0; fila < filas; fila++)
+            {
+                int y = alto - 1 - (fila * lado + lado / 2);
+                Color32 p = pixeles[y * ancho + 3 * lado + lado / 2];
+                int d = Mathf.Abs(p.r - c.r) + Mathf.Abs(p.g - c.g) + Mathf.Abs(p.b - c.b);
+                if (d < menor)
+                {
+                    menor = d;
+                    mejor = fila;
+                }
+            }
+            return new Vector2(3.5f / 8f, 1f - (mejor + 0.5f) / filas);
+        }
+
         static bool EsCaraDeFuego(Vector2 uv)
         {
             int fila = FilaFuego();

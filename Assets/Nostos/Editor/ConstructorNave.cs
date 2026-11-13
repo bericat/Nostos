@@ -74,6 +74,7 @@ namespace Nostos.EditorTools
         static void ColocarNave(Valle valle)
         {
             colisionSurco = null;
+            montones.Clear();
             Vector3 centro = new Vector3((NaveCeldaX + NaveAncho * 0.5f) * TamCelda, 0f, (NaveCeldaZ + NaveFondo * 0.5f) * TamCelda);
             var modelo = AssetDatabase.LoadAssetAtPath<GameObject>(CarpetaNave + "Prefabs/ModularExamples/StarSparrow" + ModeloNave + ".prefab");
             if (modelo == null)
@@ -179,7 +180,7 @@ namespace Nostos.EditorTools
             casco.fondo = NaveFondo;
             casco.cuerpo = cuerpo;
             casco.giroNaufragio = new Vector3(6f, 0f, -11f);
-            casco.hundimiento = 0.5f;
+            casco.hundimiento = 0.75f;
 
             // La nave ya en su postura de naufragio (CascoNave la mantiene igual al jugar), para que
             // el surco se arrime a la forma real del casco.
@@ -203,7 +204,10 @@ namespace Nostos.EditorTools
             {
                 QuitarCasco();
             }
-            casco.restos = TirarPiezas(valle, surco, restos, escala, pintura);
+            // Tierra echada sobre el casco: arrimada a la panza y a los costados, en montón.
+            var colores = new ColorTerreno(surco);
+            Enterrar(piezasNucleo, valle, colores, restos, "casco", 0.6f, 2.4f, 0.45f);
+            casco.restos = TirarPiezas(valle, surco, restos, escala, pintura, colores);
 
             // Humo y fuego: del hueco de los motores y de la tierra quemada.
             var fuegos = new List<ParticleSystem>();
@@ -738,7 +742,7 @@ namespace Nostos.EditorTools
         /// Piezas que se soltaron en el choque, medio enterradas por el surco. Una entrada por
         /// módulo del juego (la 0 es el módulo 1): al montarlo, desaparecen del surco.
         /// </summary>
-        static GameObject[] TirarPiezas(Valle valle, Surco surco, Transform padre, float escala, Material pintura)
+        static GameObject[] TirarPiezas(Valle valle, Surco surco, Transform padre, float escala, Material pintura, ColorTerreno colores)
         {
             var grupos = new GameObject[5];
             string[] nombres = { "casco", "soporte vital", "motor", "navegación", "combustible" };
@@ -750,16 +754,17 @@ namespace Nostos.EditorTools
             // (tipo, t, lateral en m, giro en grados x/y/z, cuánto se hunde)
             var tiradas = new (string tipo, float t, float lateral, Vector3 giro, float hundido)[]
             {
-                ("Engine", 0.11f, 2.6f, new Vector3(18f, 40f, 95f), 0.3f),       // se soltó en el primer toque
-                ("Fin", 0.3f, -0.4f, new Vector3(-12f, 130f, 160f), 0.25f),
-                ("Wing", 0.4f, -3.4f, new Vector3(8f, -35f, 172f), 0.15f),       // ala arrancada, boca abajo
-                ("Tail", 0.5f, 0.6f, new Vector3(25f, 80f, -30f), 0.35f),
-                ("Wing", 0.63f, 3.8f, new Vector3(-14f, 200f, 24f), 0.25f),
-                ("Plasma", 0.72f, -1.1f, new Vector3(70f, 15f, 10f), 0.3f),
-                ("Fin", 0.8f, 2.9f, new Vector3(5f, 300f, 110f), 0.2f),
-                ("Tail", 0.86f, -2.7f, new Vector3(-30f, 10f, 75f), 0.3f),
-                ("Thruster", 0.93f, 1.4f, new Vector3(95f, 60f, 0f), 0.35f),
+                ("Engine", 0.11f, 2.6f, new Vector3(18f, 40f, 95f), 0.42f),      // se soltó en el primer toque
+                ("Fin", 0.3f, -0.4f, new Vector3(-12f, 130f, 160f), 0.4f),
+                ("Wing", 0.4f, -3.4f, new Vector3(8f, -35f, 172f), 0.3f),        // ala arrancada, boca abajo
+                ("Tail", 0.5f, 0.6f, new Vector3(25f, 80f, -30f), 0.45f),
+                ("Wing", 0.63f, 3.8f, new Vector3(-14f, 200f, 24f), 0.38f),
+                ("Plasma", 0.72f, -1.1f, new Vector3(70f, 15f, 10f), 0.42f),
+                ("Fin", 0.8f, 2.9f, new Vector3(5f, 300f, 110f), 0.35f),
+                ("Tail", 0.86f, -2.7f, new Vector3(-30f, 10f, 75f), 0.42f),
+                ("Thruster", 0.93f, 1.4f, new Vector3(95f, 60f, 0f), 0.45f),
             };
+            int numeroPieza = 0;
             foreach (var p in tiradas)
             {
                 int modulo = ModuloDePieza(p.tipo);
@@ -774,6 +779,13 @@ namespace Nostos.EditorTools
                 Asentar(pieza, new Vector3(sitio.x, suelo, sitio.z));
                 pieza.transform.position += Vector3.down * (Medir(pieza).size.y * p.hundido);
                 foreach (Transform t in pieza.GetComponentsInChildren<Transform>(true)) t.gameObject.isStatic = false;
+                // Tierra encima: según lo que asoma la pieza y lo grande que es.
+                Physics.SyncTransforms();
+                Bounds b = Medir(pieza);
+                float asoma = Mathf.Max(0.1f, b.max.y - suelo);
+                float alto = Mathf.Clamp(asoma * 0.4f, 0.15f, 0.55f);
+                float ancho = Mathf.Clamp(Mathf.Max(b.size.x, b.size.z) * 0.45f, 0.9f, 1.8f);
+                Enterrar(new[] { pieza }, valle, colores, padre, "pieza_" + (numeroPieza++), alto, ancho, 0.15f);
             }
             return grupos;
         }

@@ -17,15 +17,21 @@ namespace Nostos.EditorTools
         const float BajoLaTierra = 0.08f;
 
         static MeshCollider colisionSurco;
+        static readonly List<MeshCollider> montones = new List<MeshCollider>();
 
         /// <summary>Altura del suelo donde se ve, contando el surco (su tierra manda donde está).</summary>
         static float SueloConSurco(Valle valle, float x, float z)
         {
             float h = valle != null ? valle.Altura(x, z) : 0f;
-            if (colisionSurco != null
-                && colisionSurco.Raycast(new Ray(new Vector3(x, h + 30f, z), Vector3.down), out RaycastHit golpe, 60f))
-                return golpe.point.y;
-            return h;
+            var rayo = new Ray(new Vector3(x, h + 30f, z), Vector3.down);
+            float alto = h;
+            if (colisionSurco != null && colisionSurco.Raycast(rayo, out RaycastHit golpe, 60f)) alto = golpe.point.y;
+            // La tierra echada sobre la nave y las piezas va por encima.
+            foreach (MeshCollider m in montones)
+            {
+                if (m != null && m.Raycast(rayo, out RaycastHit encima, 60f)) alto = Mathf.Max(alto, encima.point.y);
+            }
+            return alto;
         }
 
         static void HundirSueloBajoElSurco(MeshCollider surco)

@@ -228,12 +228,8 @@ namespace Nostos
             for (int i = 0; i < opciones.Length; i++)
             {
                 var fila = new Rect(x - 18f, y + i * (alto + separacion), ancho, alto);
-                Event e = Event.current;
-                if (e.type == EventType.MouseMove && fila.Contains(e.mousePosition) && foco != i)
-                {
-                    foco = i;
-                    e.Use();
-                }
+                // Basta con pasar el ratón por encima para resaltarla.
+                if (Tema.RatonPasa(fila)) foco = i;
                 bool elegida = foco == i;
                 float entra = elegida ? 1f : 0f;
                 if (elegida)

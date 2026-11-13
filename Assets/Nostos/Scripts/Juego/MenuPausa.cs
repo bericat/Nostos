@@ -154,8 +154,7 @@ namespace Nostos
             for (int i = 0; i < Opciones.Length; i++)
             {
                 var fila = new Rect(dentro.x - 8f, dentro.y + 66f + i * 50f, dentro.width + 16f, 44f);
-                Event e = Event.current;
-                if (e.type == EventType.MouseMove && fila.Contains(e.mousePosition)) foco = i;
+                if (Tema.RatonPasa(fila)) foco = i;
                 bool elegida = foco == i;
                 if (elegida)
                 {

@@ -52,7 +52,7 @@ namespace Nostos.EditorTools
                     f.gameObject.AddComponent<MeshCollider>().sharedMesh = f.sharedMesh;
                 }
                 modelos[estado] = PrefabUtility.SaveAsPrefabAsset(raiz, CarpetaPrefabsPaquetes + "/herreria_" + (estado + 1) + ".prefab");
-                if (estado == 3) MiniaturaHerreria(raiz);
+                if (estado == 3) Miniatura(raiz, "Assets/Nostos/Resources/UI/Edificios/herreria.png", Quaternion.Euler(30f, -38f, 0f) * Vector3.forward, 26f);
                 Object.DestroyImmediate(raiz);
             }
             return modelos;
@@ -129,10 +129,12 @@ namespace Nostos.EditorTools
             }
         }
 
-        /// <summary>Miniatura del menú de construcción (256 x 256, fondo transparente), como las demás.</summary>
-        static void MiniaturaHerreria(GameObject casa)
+        /// <summary>
+        /// Dibujo de 256 x 256 con fondo transparente del objeto visto en la dirección `mira`
+        /// (miniaturas del menú de construcción, herramientas del inventario).
+        /// </summary>
+        static void Miniatura(GameObject casa, string ruta, Vector3 mira, float campo)
         {
-            const string ruta = "Assets/Nostos/Resources/UI/Edificios/herreria.png";
             var copia = Object.Instantiate(casa);
             copia.transform.position = new Vector3(0f, -2000f, 0f);
             Bounds b = Medir(copia);
@@ -148,10 +150,10 @@ namespace Nostos.EditorTools
             camara.enabled = false;
             camara.clearFlags = CameraClearFlags.SolidColor;
             camara.backgroundColor = new Color(0f, 0f, 0f, 0f);
-            camara.fieldOfView = 26f;
+            camara.fieldOfView = campo;
             camara.nearClipPlane = 0.5f;
             camara.farClipPlane = 400f;
-            Vector3 mira = Quaternion.Euler(30f, -38f, 0f) * Vector3.forward;
+            mira = mira.normalized;
             float distancia = b.extents.magnitude / Mathf.Sin(camara.fieldOfView * 0.5f * Mathf.Deg2Rad) * 1.02f;
             camaraGo.transform.SetPositionAndRotation(b.center - mira * distancia, Quaternion.LookRotation(mira));
 
@@ -177,7 +179,7 @@ namespace Nostos.EditorTools
                         chica.SetPixel(x, y, c);
                     }
                 chica.Apply();
-                CarpetasNostos.Asegurar("Assets/Nostos/Resources/UI/Edificios");
+                CarpetasNostos.Asegurar(Path.GetDirectoryName(ruta).Replace('\\', '/'));
                 File.WriteAllBytes(ruta, chica.EncodeToPNG());
                 Object.DestroyImmediate(grande);
                 Object.DestroyImmediate(chica);
@@ -192,7 +194,7 @@ namespace Nostos.EditorTools
             }
             catch (System.Exception error)
             {
-                Debug.LogWarning("Nostos: no se pudo hacer la miniatura de la herrería. " + error.Message);
+                Debug.LogWarning("Nostos: no se pudo hacer el dibujo " + ruta + ". " + error.Message);
             }
             finally
             {

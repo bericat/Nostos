@@ -132,7 +132,7 @@ namespace Nostos
             {
                 var fila = new Rect(r.x, y + i * (alto + 6f), r.width, alto);
                 bool encima = fila.Contains(Event.current.mousePosition);
-                if (encima && Event.current.type == EventType.MouseMove) foco = i;
+                if (Tema.RatonPasa(fila)) foco = i;
                 bool enfocada = foco == i;
                 if (enfocada) Tema.Relleno(fila, new Color(Tema.Ocre.r, Tema.Ocre.g, Tema.Ocre.b, 0.22f), 8f);
                 if (enfocada) Tema.Relleno(new Rect(fila.x, fila.y + 8f, 4f, fila.height - 16f), Tema.Ocre, 2f);

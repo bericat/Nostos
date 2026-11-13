@@ -30,7 +30,8 @@ namespace Nostos
         Obras,
         Pestana,
         Pausa,
-        Aceptar
+        Aceptar,
+        Inventario
     }
 
     /// <summary>
@@ -96,6 +97,27 @@ namespace Nostos
         // ---------------------------------------------------------------- preparación
 
         /// <summary>Llamar al principio de cada OnGUI: carga lo necesario y fija la escala.</summary>
+        static Vector2 ratonVisto = new Vector2(-1000f, -1000f);
+        static int frameRaton = -10;
+
+        /// <summary>
+        /// ¿El ratón acaba de moverse y está sobre `r`? Para resaltar opciones solo con pasar el
+        /// ratón por encima: Unity casi no manda MouseMove en juego, así que se compara la posición
+        /// en cada evento. Si el ratón está quieto devuelve false y el teclado o el mando mandan.
+        /// </summary>
+        public static bool RatonPasa(Rect r)
+        {
+            Event e = Event.current;
+            if (e == null || e.type == EventType.Layout) return false;
+            Vector2 p = e.mousePosition;
+            if ((p - ratonVisto).sqrMagnitude > 0.25f)
+            {
+                ratonVisto = p;
+                frameRaton = Time.frameCount;
+            }
+            return Time.frameCount - frameRaton <= 1 && r.Contains(p);
+        }
+
         public static void Empezar()
         {
             if (!cargado) Cargar();
@@ -286,6 +308,7 @@ namespace Nostos
                     case Boton.Pestana: return "LB RB";
                     case Boton.Pausa: return "Menu";
                     case Boton.Aceptar: return "A";
+                    case Boton.Inventario: return "▲";
                 }
             }
             switch (boton)
@@ -313,6 +336,7 @@ namespace Nostos
                 case Boton.Pestana: return "Q E";
                 case Boton.Pausa: return "Esc";
                 case Boton.Aceptar: return "Intro";
+                case Boton.Inventario: return "I";
             }
             return "?";
         }

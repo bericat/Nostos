@@ -30,11 +30,13 @@ namespace Nostos
         public Material material;
         [Tooltip("El suelo del valle, para que el camino siga su forma.")]
         public Collider suelo;
+        [Tooltip("Coordenada de la paleta del color hierba, por si el suelo no da la suya.")]
+        public Vector2 colorHierba = new Vector2(0.4375f, 0.5f);
 
         /// <summary>Partes por lado de cada celda en la malla del camino.</summary>
         const int Partes = 6;
         /// <summary>Hasta dónde sale la malla fuera de las celdas de camino (m): lo que el borde puede morder.</summary>
-        const float Margen = 0.65f;
+        public const float Margen = 1.5f;
         const int CeldasTrozo = 8;
         readonly Dictionary<Vector2Int, GameObject> trozos = new Dictionary<Vector2Int, GameObject>();
 
@@ -71,6 +73,29 @@ namespace Nostos
         void Marcar()
         {
             pendiente = true;
+        }
+
+        /// <summary>
+        /// Distancia (m) del punto a la celda de camino más cercana entre las vecinas de su celda, o
+        /// infinito si no hay ninguna. 0 si está sobre un camino. La usa la hierba para clarear.
+        /// </summary>
+        public static float DistanciaACamino(Mundo mundo, float x, float z)
+        {
+            Rejilla rejilla = mundo.Rejilla;
+            Celda celda = rejilla.CeldaDesdeMundo(x, z);
+            if (mundo.EsCamino(celda)) return 0f;
+            float lado = rejilla.TamCelda, mejor = float.PositiveInfinity;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    var otra = new Celda(celda.X + dx, celda.Z + dz);
+                    if (!mundo.EsCamino(otra)) continue;
+                    rejilla.CentroDeCelda(otra, out float cx, out float cz);
+                    float ax = Mathf.Max(Mathf.Abs(x - cx) - lado * 0.5f, 0f);
+                    float az = Mathf.Max(Mathf.Abs(z - cz) - lado * 0.5f, 0f);
+                    mejor = Mathf.Min(mejor, Mathf.Sqrt(ax * ax + az * az));
+                }
+            return mejor;
         }
 
         /// <summary>¿Está este punto del mundo sobre un camino?</summary>
@@ -182,6 +207,7 @@ namespace Nostos
             var vertices = new List<Vector3>();
             var normales = new List<Vector3>();
             var dentro = new List<Vector2>();
+            var paleta = new List<Vector2>();
             var indices = new List<int>();
             var fila = new int[(Partes + 1) * (Partes + 1)];
             var cerca = new bool[3, 3];
@@ -220,15 +246,18 @@ namespace Nostos
                         float x = x0 + i * lado / Partes, z = z0 + j * lado / Partes;
                         Vector3 normal = Vector3.up;
                         float y = altura;
+                        Vector2 color = colorHierba;
                         if (suelo != null && suelo.Raycast(new Ray(new Vector3(x, 200f, z), Vector3.down), out RaycastHit golpe, 400f))
                         {
                             y = golpe.point.y + 0.03f;
                             normal = golpe.normal;
+                            if (golpe.textureCoord != Vector2.zero) color = golpe.textureCoord;
                         }
                         fila[k] = vertices.Count;
                         vertices.Add(new Vector3(x, y, z));
                         normales.Add(normal);
                         dentro.Add(new Vector2(Dentro(x, z, x0, z0, lado, esCamino, cerca), 0f));
+                        paleta.Add(color);
                         return fila[k];
                     }
                 }
@@ -239,6 +268,7 @@ namespace Nostos
             malla.SetVertices(vertices);
             malla.SetNormals(normales);
             malla.SetUVs(0, dentro);
+            malla.SetUVs(1, paleta);
             malla.SetTriangles(indices, 0);
             malla.RecalculateBounds();
             var go = new GameObject("Camino (trozo " + clave.x + "," + clave.y + ")");
@@ -258,7 +288,7 @@ namespace Nostos
         /// </summary>
         static float Dentro(float x, float z, float x0, float z0, float lado, bool esCamino, bool[,] cerca)
         {
-            float mejor = 1f;
+            float mejor = Margen + 0.1f;
             for (int dx = -1; dx <= 1; dx++)
                 for (int dz = -1; dz <= 1; dz++)
                 {

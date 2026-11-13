@@ -36,6 +36,17 @@ namespace Nostos.EditorTools
                 Empunadura("Assets/Stylized Tools/Prefabs/shovel.prefab", "pala", 0.9f, Frente.CaraHoja),
                 Empunadura("Assets/Propsybrush/Pickaxe/Prefabs/Pickaxe.prefab", "pico_bueno", 0.7f, Frente.LargoCabeza),
             };
+            // Su dibujo para el inventario: de perfil, con la cabeza arriba a la derecha.
+            string[] archivos = { "hacha", "pico", "pala", "pico_bueno" };
+            for (int i = 0; i < prefabs.Length; i++)
+            {
+                if (prefabs[i] == null) continue;
+                var muestra = (GameObject)PrefabUtility.InstantiatePrefab(prefabs[i]);
+                muestra.transform.rotation = Quaternion.Euler(-38f, 0f, 0f);
+                Miniatura(muestra, "Assets/Nostos/Resources/UI/Herramientas/" + archivos[i] + ".png", Vector3.right, 22f);
+                Object.DestroyImmediate(muestra);
+            }
+
             var enMano = new GameObject[prefabs.Length];
             for (int i = 0; i < prefabs.Length; i++)
             {

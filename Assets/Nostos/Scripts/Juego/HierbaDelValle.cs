@@ -105,7 +105,15 @@ namespace Nostos
                 {
                     Celda celda = trozo.celdas[i];
                     if (!mundo.Rejilla.EstaLibre(celda) || mundo.EsCamino(celda)) continue;
-                    trozo.visibles[k++] = trozo.todas[i];
+                    // Junto a un camino la hierba clarea y es más baja: el borde se funde.
+                    Matrix4x4 m = trozo.todas[i];
+                    float d = Caminos.DistanciaACamino(mundo, m.m03, m.m23);
+                    if (d < 1.3f)
+                    {
+                        if (d < 0.35f || (i * 7919 % 10) < Mathf.RoundToInt(7f * (1f - d / 1.3f))) continue;
+                        m *= Matrix4x4.Scale(Vector3.one * Mathf.Lerp(0.55f, 1f, d / 1.3f));
+                    }
+                    trozo.visibles[k++] = m;
                 }
                 trozo.cuantas = k;
             }

@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F17-caminos";
+        const string Version = "F18-inventario";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -399,6 +399,7 @@ namespace Nostos.EditorTools
             caminos.losas = System.Array.FindAll(caminos.losas, m => m != null);
             // Empedrado de la plaza con el borde roto contra la hierba (F17).
             caminos.material = MaterialCamino();
+            caminos.colorHierba = UvPaleta(new Color32(150, 160, 74, 255));
             GameObject valleCaminos = GameObject.Find("Valle");
             Transform sueloCaminos = valleCaminos != null ? BuscarHijo(valleCaminos.transform, "Suelo") : null;
             caminos.suelo = sueloCaminos != null ? sueloCaminos.GetComponent<Collider>() : null;
@@ -424,6 +425,10 @@ namespace Nostos.EditorTools
             hud.jugador = controlador;
             hud.colocador = colocador;
             hud.camara = camara;
+            // Inventario a pie (I / ▲): mochila y herramientas (F18).
+            var inventario = sistemas.AddComponent<Inventario>();
+            inventario.control = control;
+            hud.inventario = inventario;
 
             // Menú de construcción (cuaderno de Nicias) y menú de pausa
             var menuObras = sistemas.AddComponent<MenuConstruccion>();
@@ -859,6 +864,10 @@ namespace Nostos.EditorTools
             material.SetTexture("_BaseMap", piedra);
             material.mainTexture = piedra;
             if (tierra != null) material.SetTexture("_Tierra", tierra);
+            // El borde se funde en el césped pintado igual que el suelo del valle.
+            var paleta = AssetDatabase.LoadAssetAtPath<Texture2D>(ImportadorKit.RutaTextura);
+            if (paleta != null) material.SetTexture("_Paleta", paleta);
+            CespedEn(material);
             EditorUtility.SetDirty(material);
             return material;
         }

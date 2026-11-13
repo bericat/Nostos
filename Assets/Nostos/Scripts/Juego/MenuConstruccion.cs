@@ -368,11 +368,7 @@ namespace Nostos
                 int fila = k / Columnas;
                 var l = new Rect(rejilla.x + col * (lado + 12f), rejilla.y + fila * (lado + 14f), lado, lado);
                 if (l.yMax > rejilla.yMax + 20f) break;
-                if (e.type == EventType.MouseMove && l.Contains(e.mousePosition) && foco != k)
-                {
-                    foco = k;
-                    e.Use();
-                }
+                if (Tema.RatonPasa(l)) foco = k;
                 Lamina(l, casillas[k], k == foco, casillas[k] == colocador.Indice);
                 if (GUI.Button(l, GUIContent.none, GUIStyle.none))
                 {
