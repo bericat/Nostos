@@ -6,9 +6,11 @@ using UnityEngine;
 namespace Nostos
 {
     /// <summary>
-    /// Dibuja las losas de los caminos que guarda la simulación y marca su trozo de NavMesh con
-    /// un área propia, más barata, para que los colonos los prefieran. Andar por un camino es
-    /// más rápido, tanto para los colonos como para Nicias.
+    /// Dibuja los caminos que guarda la simulación y marca su trozo de NavMesh con un área propia,
+    /// más barata, para que los colonos los prefieran. Andar por un camino es más rápido, tanto
+    /// para los colonos como para Nicias. Con `material` (shader Nostos/Camino), el camino es una
+    /// sola malla por trozo del valle que sigue el suelo, con el empedrado de la plaza y el borde
+    /// roto contra la hierba; sin él, losas sueltas por celda como antes.
     /// </summary>
     [DefaultExecutionOrder(-70)]
     public class Caminos : MonoBehaviour
@@ -24,6 +26,17 @@ namespace Nostos
         [Tooltip("Modelos de losa de 2 × 2 m. Se elige uno por celda.")]
         public GameObject[] losas;
         public float altura = 0.01f;
+        [Tooltip("Shader Nostos/Camino: empedrado continuo con el borde irregular.")]
+        public Material material;
+        [Tooltip("El suelo del valle, para que el camino siga su forma.")]
+        public Collider suelo;
+
+        /// <summary>Partes por lado de cada celda en la malla del camino.</summary>
+        const int Partes = 6;
+        /// <summary>Hasta dónde sale la malla fuera de las celdas de camino (m): lo que el borde puede morder.</summary>
+        const float Margen = 0.65f;
+        const int CeldasTrozo = 8;
+        readonly Dictionary<Vector2Int, GameObject> trozos = new Dictionary<Vector2Int, GameObject>();
 
         readonly Dictionary<Celda, GameObject> visibles = new Dictionary<Celda, GameObject>();
         bool pendiente;
@@ -86,11 +99,23 @@ namespace Nostos
                 cambio = true;
             }
 
+            var cambiadas = new List<Celda>(sobrantes);
             foreach (Celda celda in mundo.Caminos)
             {
                 if (visibles.ContainsKey(celda)) continue;
                 visibles.Add(celda, CrearLosa(celda));
+                cambiadas.Add(celda);
                 cambio = true;
+            }
+
+            if (material != null && cambiadas.Count > 0)
+            {
+                var sucios = new HashSet<Vector2Int>();
+                foreach (Celda c in cambiadas)
+                    for (int dx = -1; dx <= 1; dx++)
+                        for (int dz = -1; dz <= 1; dz++)
+                            sucios.Add(Trozo(c.X + dx, c.Z + dz));
+                foreach (Vector2Int t in sucios) RehacerTrozo(t);
             }
 
             // El NavMesh se rehace con calma (Navegacion espera medio segundo y agrupa avisos).
@@ -108,7 +133,7 @@ namespace Nostos
             losa.transform.position = new Vector3(x, altura, z);
             losa.transform.rotation = Quaternion.Euler(0f, 90f * (azar & 3), 0f);
 
-            if (losas != null && losas.Length > 0)
+            if (material == null && losas != null && losas.Length > 0)
             {
                 GameObject modelo = losas[(azar >> 2) % losas.Length];
                 if (modelo != null)
@@ -132,6 +157,119 @@ namespace Nostos
             volumen.center = new Vector3(0f, 0.5f, 0f);
             volumen.area = AreaCamino;
             return losa;
+        }
+
+        // ---------------------------------------------------------------- malla continua
+
+        static Vector2Int Trozo(int x, int z)
+        {
+            return new Vector2Int(Mathf.FloorToInt(x / (float)CeldasTrozo), Mathf.FloorToInt(z / (float)CeldasTrozo));
+        }
+
+        void RehacerTrozo(Vector2Int clave)
+        {
+            if (trozos.TryGetValue(clave, out GameObject viejo) && viejo != null)
+            {
+                Mesh vieja = viejo.GetComponent<MeshFilter>().sharedMesh;
+                Destroy(viejo);
+                if (vieja != null) Destroy(vieja);
+            }
+            trozos.Remove(clave);
+
+            Mundo mundo = juego.Mundo;
+            Rejilla rejilla = mundo.Rejilla;
+            float lado = rejilla.TamCelda;
+            var vertices = new List<Vector3>();
+            var normales = new List<Vector3>();
+            var dentro = new List<Vector2>();
+            var indices = new List<int>();
+            var fila = new int[(Partes + 1) * (Partes + 1)];
+            var cerca = new bool[3, 3];
+
+            for (int cx = clave.x * CeldasTrozo; cx < (clave.x + 1) * CeldasTrozo; cx++)
+                for (int cz = clave.y * CeldasTrozo; cz < (clave.y + 1) * CeldasTrozo; cz++)
+                {
+                    bool alguno = false;
+                    for (int dx = -1; dx <= 1; dx++)
+                        for (int dz = -1; dz <= 1; dz++)
+                        {
+                            cerca[dx + 1, dz + 1] = mundo.EsCamino(new Celda(cx + dx, cz + dz));
+                            alguno |= cerca[dx + 1, dz + 1];
+                        }
+                    if (!alguno) continue;
+                    bool esCamino = cerca[1, 1];
+                    rejilla.CentroDeCelda(new Celda(cx, cz), out float x0, out float z0);
+                    x0 -= lado * 0.5f;
+                    z0 -= lado * 0.5f;
+
+                    for (int k = 0; k < fila.Length; k++) fila[k] = -1;
+                    for (int i = 0; i < Partes; i++)
+                        for (int j = 0; j < Partes; j++)
+                        {
+                            float mx = x0 + (i + 0.5f) * lado / Partes, mz = z0 + (j + 0.5f) * lado / Partes;
+                            if (Dentro(mx, mz, x0, z0, lado, esCamino, cerca) < -Margen) continue;
+                            int a = Vertice(i, j), b = Vertice(i + 1, j), c = Vertice(i, j + 1), d = Vertice(i + 1, j + 1);
+                            indices.Add(a); indices.Add(c); indices.Add(b);
+                            indices.Add(b); indices.Add(c); indices.Add(d);
+                        }
+
+                    int Vertice(int i, int j)
+                    {
+                        int k = i * (Partes + 1) + j;
+                        if (fila[k] >= 0) return fila[k];
+                        float x = x0 + i * lado / Partes, z = z0 + j * lado / Partes;
+                        Vector3 normal = Vector3.up;
+                        float y = altura;
+                        if (suelo != null && suelo.Raycast(new Ray(new Vector3(x, 200f, z), Vector3.down), out RaycastHit golpe, 400f))
+                        {
+                            y = golpe.point.y + 0.03f;
+                            normal = golpe.normal;
+                        }
+                        fila[k] = vertices.Count;
+                        vertices.Add(new Vector3(x, y, z));
+                        normales.Add(normal);
+                        dentro.Add(new Vector2(Dentro(x, z, x0, z0, lado, esCamino, cerca), 0f));
+                        return fila[k];
+                    }
+                }
+            if (indices.Count == 0) return;
+
+            var malla = new Mesh { name = "Camino " + clave.x + "," + clave.y };
+            if (vertices.Count > 65000) malla.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+            malla.SetVertices(vertices);
+            malla.SetNormals(normales);
+            malla.SetUVs(0, dentro);
+            malla.SetTriangles(indices, 0);
+            malla.RecalculateBounds();
+            var go = new GameObject("Camino (trozo " + clave.x + "," + clave.y + ")");
+            go.transform.SetParent(transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = malla;
+            var render = go.AddComponent<MeshRenderer>();
+            render.sharedMaterial = material;
+            render.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            render.receiveShadows = true;
+            trozos[clave] = go;
+        }
+
+        /// <summary>
+        /// Metros dentro del camino del punto (x, z) de la celda que empieza en (x0, z0): positivo
+        /// dentro (hasta la celda vecina sin camino), negativo fuera (hasta la vecina con camino).
+        /// Solo cuentan las 8 vecinas: el margen es menor que una celda.
+        /// </summary>
+        static float Dentro(float x, float z, float x0, float z0, float lado, bool esCamino, bool[,] cerca)
+        {
+            float mejor = 1f;
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    if (dx == 0 && dz == 0) continue;
+                    if (cerca[dx + 1, dz + 1] == esCamino) continue;
+                    float cx = x0 + (dx + 0.5f) * lado, cz = z0 + (dz + 0.5f) * lado;
+                    float ax = Mathf.Max(Mathf.Abs(x - cx) - lado * 0.5f, 0f);
+                    float az = Mathf.Max(Mathf.Abs(z - cz) - lado * 0.5f, 0f);
+                    mejor = Mathf.Min(mejor, Mathf.Sqrt(ax * ax + az * az));
+                }
+            return esCamino ? mejor : -mejor;
         }
 
         static int Mezcla(int x, int z)

@@ -73,6 +73,7 @@ namespace Nostos.EditorTools
 
         static void ColocarNave(Valle valle)
         {
+            colisionSurco = null;
             Vector3 centro = new Vector3((NaveCeldaX + NaveAncho * 0.5f) * TamCelda, 0f, (NaveCeldaZ + NaveFondo * 0.5f) * TamCelda);
             var modelo = AssetDatabase.LoadAssetAtPath<GameObject>(CarpetaNave + "Prefabs/ModularExamples/StarSparrow" + ModeloNave + ".prefab");
             if (modelo == null)
@@ -212,11 +213,11 @@ namespace Nostos.EditorTools
             Fuego(cuerpo, hueco, 1f, fuegos, luces);
             humos.Add(Humo(cuerpo, hueco + Vector3.up * 0.4f, 1f));
             Vector3 cerca = surco.Punto(0.9f, 0.6f);
-            cerca.y = valle.Altura(cerca.x, cerca.z) + 0.05f;
+            cerca.y = SueloConSurco(valle, cerca.x, cerca.z) + 0.05f;
             Fuego(restos, cerca, 0.8f, fuegos, luces);
             humos.Add(Humo(restos, cerca + Vector3.up * 0.2f, 0.55f));
             Vector3 toque = surco.Punto(0.06f, -0.3f);
-            toque.y = valle.Altura(toque.x, toque.z) + 0.1f;
+            toque.y = SueloConSurco(valle, toque.x, toque.z) + 0.1f;
             Fuego(restos, toque, 0.6f, fuegos, luces);
             casco.fuegos = fuegos.ToArray();
             casco.lucesFuego = luces.ToArray();
@@ -355,7 +356,10 @@ namespace Nostos.EditorTools
             CespedEn(material);
             EditorUtility.SetDirty(material);
             render.sharedMaterial = material;
-            go.AddComponent<MeshCollider>().sharedMesh = malla;
+            var colision = go.AddComponent<MeshCollider>();
+            colision.sharedMesh = malla;
+            // El fondo del surco va por debajo del suelo del valle: se hunde el suelo ahí.
+            HundirSueloBajoElSurco(colision);
 
             // Que no se siembre nada encima, y que no se construya sobre el surco.
             for (float t = 0f; t <= 1.001f; t += 0.04f)
@@ -387,6 +391,8 @@ namespace Nostos.EditorTools
             int pasos = Mathf.Max(8, Mathf.CeilToInt(metros / 0.45f));
             int base0 = vertices.Count;
             Vector3 avance = (surco.fin - surco.inicio).normalized;
+            var sinCasco = new List<float>();   // altura de cada vértice sin arrimar al casco
+            var techo = new List<float>();      // panza del casco encima (o +infinito)
             for (int i = 0; i <= pasos; i++)
             {
                 float d = i / (float)pasos * metros;                    // metros desde el principio del tramo
@@ -408,6 +414,12 @@ namespace Nostos.EditorTools
                 float monton = empuje ? Mathf.Sin(Mathf.Clamp01(e * 1.15f) * Mathf.PI) * 1.2f : 0f;
                 Vector3 eje = surco.Punto(t, 0f, true) + avance * pasado;
                 float quema = empuje ? Mathf.SmoothStep(0f, 1f, (k - 0.55f) / 0.45f) : Mathf.Clamp01(1f - k * 1.6f) * 0.8f;
+                // Lo hondo del surco: poco en el rebote y más cuanto más se clavó el casco. Se
+                // deshace hacia los extremos y bajo el montón, para no dejar escalones.
+                float hondoInicio = Mathf.SmoothStep(0f, 1f, (d - 0.8f) / 3.2f);
+                float hondoFinal = empuje ? 1f - Mathf.SmoothStep(0f, 0.55f, e) : Mathf.SmoothStep(0f, 1f, (metros - d - 0.8f) / 3.2f);
+                float hondo = (empuje ? Mathf.Lerp(0.38f, 0.85f, Mathf.SmoothStep(0f, 1f, k)) : 0.28f * Mathf.Sin(k * Mathf.PI))
+                              * Mathf.Min(hondoInicio, hondoFinal);
 
                 for (int j = 0; j <= Lados; j++)
                 {
@@ -423,17 +435,19 @@ namespace Nostos.EditorTools
                     float y;
                     float tierra;
                     float fondo;   // el fondo del surco, apisonado y en sombra, se oscurece
-                    if (a < wc * 0.7f)
+                    if (a < wc * 0.45f)
                     {
-                        // fondo: apisonado, con estrías a lo largo
-                        y = 0.035f + ondas * 0.05f + Mathf.Sin(x * 5.5f) * 0.012f;
+                        // fondo: hundido y apisonado, con estrías a lo largo
+                        float cuenco = a / Mathf.Max(0.01f, wc * 0.45f);
+                        y = -hondo * (1f - 0.12f * cuenco * cuenco) + ondas * 0.05f + Mathf.Sin(x * 5.5f) * 0.012f;
                         tierra = 1f;
                         fondo = 1f;
                     }
                     else if (a < wc)
                     {
-                        float s = Mathf.SmoothStep(0f, 1f, (a - wc * 0.7f) / (wc * 0.3f));
-                        y = Mathf.Lerp(0.035f, cordon, s) + ondas * 0.06f;
+                        // pared: sube del fondo al cordón de tierra echada a los lados
+                        float s = Mathf.SmoothStep(0f, 1f, (a - wc * 0.45f) / (wc * 0.55f));
+                        y = Mathf.Lerp(-hondo * 0.88f, cordon, s) + ondas * 0.06f * s;
                         tierra = 1f;
                         fondo = 1f - s;
                     }
@@ -445,7 +459,8 @@ namespace Nostos.EditorTools
                         fondo = 0f;
                     }
                     float haciaFuera = Mathf.Clamp01(a / Mathf.Max(0.01f, radio));
-                    y = Mathf.Max(y, 0f) * Mathf.Max(altura, monton > 0f ? 1f : 0f) + monton * Mathf.Pow(1f - haciaFuera * haciaFuera, 1.5f);
+                    float sobre = Mathf.Max(y, 0f), bajo = Mathf.Min(y, 0f);
+                    y = sobre * Mathf.Max(altura, monton > 0f ? 1f : 0f) + bajo + monton * Mathf.Pow(1f - haciaFuera * haciaFuera, 1.5f);
                     if (j == 0 || j == Lados || i == 0 || i == pasos)
                     {
                         y = 0f;
@@ -457,15 +472,24 @@ namespace Nostos.EditorTools
                     // Fuera del llano el terreno real hace facetas: un poco más alto para no hundirse.
                     float margen = p.magnitude > 44f ? 0.07f : 0.015f;
                     float alto = suelo + margen + y;
+                    sinCasco.Add(alto);
                     // Bajo la nave y a su lado, la tierra sube hasta tocar el casco: sin huecos.
+                    // Como mucho 1 m por encima de donde estaría: el flanco del casco no la arrastra.
+                    float panza = float.PositiveInfinity;
                     if (j != 0 && j != Lados && i != 0 && i != pasos && Arrimar(p.x, p.z, out float casco))
                     {
+                        panza = BajoDelCasco(p.x, p.z);
+                        if (float.IsNaN(panza)) panza = float.PositiveInfinity;
+                        // Justo debajo, hasta la panza; alrededor, el talud llega a 1 m como mucho.
+                        float tope = float.IsPositiveInfinity(panza) || panza > suelo + 1.6f ? suelo + 1f : panza + 0.1f;
+                        casco = Mathf.Min(casco, Mathf.Max(alto, tope));
                         if (casco > alto)
                         {
                             alto = casco;
                             tierra = 1f;
                         }
                     }
+                    techo.Add(panza);
                     vertices.Add(new Vector3(p.x, alto, p.z));
                     Color32 c = colores.En(p.x, p.z);
                     c.a = (byte)Mathf.RoundToInt(Mathf.Clamp01(tierra) * 255f);
@@ -478,6 +502,7 @@ namespace Nostos.EditorTools
                 }
             }
             int fila = Lados + 1;
+            AlisarArrimado(vertices, colorV, base0, pasos + 1, fila, sinCasco, techo);
             for (int i = 0; i < pasos; i++)
             {
                 for (int j = 0; j < Lados; j++)
@@ -487,6 +512,73 @@ namespace Nostos.EditorTools
                     // Caras hacia arriba: el lado +u queda a la derecha del avance.
                     triangulos.Add(a); triangulos.Add(c); triangulos.Add(b);
                     triangulos.Add(b); triangulos.Add(c); triangulos.Add(d);
+                }
+            }
+        }
+
+        /// <summary>
+        /// La tierra arrimada al casco sale a dientes (unos vértices tocan el casco y los de al lado
+        /// no). Se alisa como un montón redondeado: varias pasadas de media con los vecinos, sin bajar
+        /// nunca de la forma sin casco ni subir por encima de la panza del casco.
+        /// </summary>
+        static void AlisarArrimado(List<Vector3> vertices, List<Color32> colorV, int base0, int filas, int columnas,
+            List<float> sinCasco, List<float> techo)
+        {
+            int n = filas * columnas;
+            var alto = new float[n];
+            var zona = new bool[n];
+            bool alguno = false;
+            for (int k = 0; k < n; k++)
+            {
+                alto[k] = vertices[base0 + k].y;
+                if (alto[k] > sinCasco[k] + 0.01f) alguno = true;
+            }
+            if (!alguno) return;
+            // Solo cerca de lo arrimado (dos vértices alrededor), y nunca los bordes de la cinta.
+            for (int i = 1; i < filas - 1; i++)
+                for (int j = 1; j < columnas - 1; j++)
+                {
+                    for (int di = -3; di <= 3 && !zona[i * columnas + j]; di++)
+                        for (int dj = -3; dj <= 3; dj++)
+                        {
+                            int ii = i + di, jj = j + dj;
+                            if (ii < 0 || jj < 0 || ii >= filas || jj >= columnas) continue;
+                            int q = ii * columnas + jj;
+                            if (alto[q] > sinCasco[q] + 0.01f)
+                            {
+                                zona[i * columnas + j] = true;
+                                break;
+                            }
+                        }
+                }
+            var nuevo = new float[n];
+            for (int pasada = 0; pasada < 7; pasada++)
+            {
+                System.Array.Copy(alto, nuevo, n);
+                for (int i = 1; i < filas - 1; i++)
+                    for (int j = 1; j < columnas - 1; j++)
+                    {
+                        int k = i * columnas + j;
+                        if (!zona[k]) continue;
+                        float suma = 0f;
+                        for (int di = -1; di <= 1; di++)
+                            for (int dj = -1; dj <= 1; dj++)
+                                suma += alto[(i + di) * columnas + j + dj] * (di == 0 && dj == 0 ? 2f : 1f);
+                        float media = suma / 10f;
+                        nuevo[k] = Mathf.Min(Mathf.Max(sinCasco[k], media), techo[k] - 0.02f);
+                    }
+                System.Array.Copy(nuevo, alto, n);
+            }
+            for (int k = 0; k < n; k++)
+            {
+                Vector3 v = vertices[base0 + k];
+                if (Mathf.Abs(v.y - alto[k]) < 1e-4f) continue;
+                vertices[base0 + k] = new Vector3(v.x, alto[k], v.z);
+                if (alto[k] > sinCasco[k] + 0.02f)
+                {
+                    Color32 c = colorV[base0 + k];
+                    c.a = 255;
+                    colorV[base0 + k] = c;
                 }
             }
         }
@@ -678,7 +770,7 @@ namespace Nostos.EditorTools
                 pieza.transform.rotation = Quaternion.Euler(p.giro);
                 Pintar(pieza, pintura);
                 Vector3 sitio = surco.Punto(p.t, p.lateral, true);
-                float suelo = valle.Altura(sitio.x, sitio.z);
+                float suelo = SueloConSurco(valle, sitio.x, sitio.z);
                 Asentar(pieza, new Vector3(sitio.x, suelo, sitio.z));
                 pieza.transform.position += Vector3.down * (Medir(pieza).size.y * p.hundido);
                 foreach (Transform t in pieza.GetComponentsInChildren<Transform>(true)) t.gameObject.isStatic = false;

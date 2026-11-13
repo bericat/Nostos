@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F16b-cajas";
+        const string Version = "F17-caminos";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -397,6 +397,12 @@ namespace Nostos.EditorTools
             if (caminos.losas[0] == null || caminos.losas[1] == null)
                 Debug.LogWarning("Nostos: faltan los modelos Naturaleza/camino_a.fbx o camino_b.fbx; los caminos se verán como cajas.");
             caminos.losas = System.Array.FindAll(caminos.losas, m => m != null);
+            // Empedrado de la plaza con el borde roto contra la hierba (F17).
+            caminos.material = MaterialCamino();
+            GameObject valleCaminos = GameObject.Find("Valle");
+            Transform sueloCaminos = valleCaminos != null ? BuscarHijo(valleCaminos.transform, "Suelo") : null;
+            caminos.suelo = sueloCaminos != null ? sueloCaminos.GetComponent<Collider>() : null;
+            if (caminos.suelo == null) Debug.LogWarning("Nostos: el suelo del valle no tiene colisionador; los caminos irán a altura fija.");
             colocador.caminos = caminos;
 
             var lineas = new GameObject("Líneas");
@@ -614,6 +620,17 @@ namespace Nostos.EditorTools
                 L(C(Recurso.Cobre, 6), C(Recurso.Cable, 4)),
                 L(), L(), 1);
 
+            // Herrería (F17): la casa del herrero del paquete, tal cual. Hace herramientas para el pueblo
+            // con mineral y leña, y en su yunque Nicias forja también el pico bueno.
+            if (HayHerreria)
+            {
+                DefinicionEdificio herreria = Definir("herreria", "Herrería", AnchoHerreria, FondoHerreria, TipoEdificio.Produccion,
+                    L(C(Recurso.Madera, 8), C(Recurso.Mineral, 6)),
+                    L(C(Recurso.Tablones, 10)),
+                    L(C(Recurso.Tablones, 6), C(Recurso.Lingotes, 4)),
+                    L(C(Recurso.Mineral, 2), C(Recurso.Madera, 1)), L(C(Recurso.Herramientas, 3)), 6);
+                return new[] { refugio, banco, herreria, aserradero, fundicion, almacen, casa, comedor, pozo, taller, optica, astillero, teleferico };
+            }
             return new[] { refugio, banco, aserradero, fundicion, almacen, casa, comedor, pozo, taller, optica, astillero, teleferico };
         }
 
@@ -642,6 +659,13 @@ namespace Nostos.EditorTools
             // El tamaño lo marca el modelo (la casa pasó de 2x2 a 3x2 con sus dos plantas): se fija siempre.
             definicion.ancho = ancho;
             definicion.fondo = fondo;
+
+            if (id == "herreria")
+            {
+                definicion.modelos = ModelosHerreria() ?? new GameObject[4];
+                EditorUtility.SetDirty(definicion);
+                return definicion;
+            }
 
             var modelos = new GameObject[4];
             for (int i = 0; i < 4; i++)
@@ -824,6 +848,21 @@ namespace Nostos.EditorTools
         }
 
         /// <summary>Material con una textura original del paquete "Lowpoly Textures Pack".</summary>
+        /// <summary>Material de los caminos: empedrado Summer_Rocks y tierra Summer_Dirt_A en el borde.</summary>
+        static Material MaterialCamino()
+        {
+            var piedra = AssetDatabase.LoadAssetAtPath<Texture2D>(CarpetaTexturasPaquete + "Summer_Rocks.png");
+            var tierra = AssetDatabase.LoadAssetAtPath<Texture2D>(CarpetaTexturasPaquete + "Summer_Dirt_A.png");
+            if (piedra == null || Shader.Find("Nostos/Camino") == null) return null;
+            Material material = CargarOCrear("CaminoEmpedrado", "Nostos/Camino");
+            material.shader = Shader.Find("Nostos/Camino");
+            material.SetTexture("_BaseMap", piedra);
+            material.mainTexture = piedra;
+            if (tierra != null) material.SetTexture("_Tierra", tierra);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
         static Material MaterialTextura(string nombre, string archivo)
         {
             var textura = AssetDatabase.LoadAssetAtPath<Texture2D>(CarpetaTexturasPaquete + archivo);

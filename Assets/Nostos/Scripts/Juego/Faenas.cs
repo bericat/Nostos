@@ -122,6 +122,7 @@ namespace Nostos
                 case "comedor": return TipoFaena.Guiso;
                 case "pozo": return TipoFaena.Manivela;
                 case "banco": return TipoFaena.Martillo;
+                case "herreria": return TipoFaena.Martillo;
             }
             return e.Datos.Tipo == TipoEdificio.Casa ? TipoFaena.Confort : TipoFaena.Ninguna;
         }
@@ -465,19 +466,21 @@ namespace Nostos
                 case 0: return "Talas el doble.";
                 case 1: return "Picas el doble de mineral.";
                 case 2: return "Sacas el doble de cobre.";
-                case 3: return "Mineral triple y cobre doble. Dura el doble.";
+                case 3: return "Mineral triple, cobre doble y dura el doble. Solo en la herrería.";
                 default: return "Los colonos las cogen del almacén.";
             }
         }
 
-        static int PrimeraQueFalta(Mundo mundo)
+        bool EnHerreria => edificio != null && edificio.Sim != null && edificio.Sim.Datos.Id == "herreria";
+
+        int PrimeraQueFalta(Mundo mundo)
         {
             for (int i = 0; i < Equipo.Numero; i++)
             {
                 if (i == (int)Herramienta.PicoBueno) continue;
                 if (!mundo.Equipo.Tiene((Herramienta)i) && mundo.AlAlcance(CosteOpcion(i))) return i;
             }
-            return mundo.AlAlcance(Equipo.Coste(Herramienta.PicoBueno)) && !mundo.Equipo.Tiene(Herramienta.PicoBueno)
+            return EnHerreria && mundo.AlAlcance(Equipo.Coste(Herramienta.PicoBueno)) && !mundo.Equipo.Tiene(Herramienta.PicoBueno)
                 ? (int)Herramienta.PicoBueno
                 : 0;
         }
@@ -500,6 +503,12 @@ namespace Nostos
             if (!Pulsa()) return;
             Juego juego = Juego.Instancia;
             if (juego == null) return;
+            if (eleccion == (int)Herramienta.PicoBueno && !EnHerreria)
+            {
+                juego.Avisar("El pico bueno pide fragua y yunque: se forja en la herrería.");
+                Sonido.Tocar(Efecto.Paso, 0.4f, true);
+                return;
+            }
             if (!juego.Mundo.AlAlcance(CosteOpcion(eleccion)))
             {
                 juego.Avisar("Para " + (eleccion < Equipo.Numero ? Equipo.ConArticulo((Herramienta)eleccion) : "eso")
@@ -819,7 +828,7 @@ namespace Nostos
             {
                 var r = new Rect(zona.x, y + i * fila, zona.width, fila - 3f);
                 bool elegida = i == eleccion;
-                bool llega = mundo != null && mundo.AlAlcance(CosteOpcion(i));
+                bool llega = mundo != null && mundo.AlAlcance(CosteOpcion(i)) && (i != (int)Herramienta.PicoBueno || EnHerreria);
                 if (elegida)
                 {
                     Tema.Relleno(r, new Color(Tema.Ocre.r, Tema.Ocre.g, Tema.Ocre.b, 0.25f), 6f);

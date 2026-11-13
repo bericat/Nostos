@@ -50,6 +50,7 @@ namespace Nostos
             { "refugio", "Donde Nicias duerme y pasa la noche a salvo. Lo primero que hay que levantar." },
             { "banco", "Un banco con tornillo y muela. Aquí forjas tu hacha, tu pico y tu pala, y herramientas para el pueblo." },
             { "aserradero", "Sierra la madera en tablones, el material de casi todo lo demás." },
+            { "herreria", "La casa del herrero, con su fragua y su yunque. Hace herramientas para el pueblo con mineral y leña, y en su yunque forjas el pico bueno." },
             { "fundicion", "Funde el mineral en lingotes y chapa. Necesita leña para el horno." },
             { "almacen", "Guarda lo que traen Nicias y los colonos. Sin almacén no hay reparto ni porteadores." },
             { "casa", "Hogar para dos colonos. Quien tiene casa duerme mejor y se fía más." },
