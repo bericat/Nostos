@@ -187,7 +187,7 @@ namespace Nostos
             main.playOnAwake = false;
             main.startLifetime = new ParticleSystem.MinMaxCurve(2.2f, 3.4f);
             main.startSpeed = new ParticleSystem.MinMaxCurve(1.8f, 4f);
-            main.start3DRotation = true;
+            main.startRotation3D = true;
             main.startRotationX = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
             main.startRotationY = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
             main.startRotationZ = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
