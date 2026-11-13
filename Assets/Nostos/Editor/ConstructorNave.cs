@@ -352,6 +352,7 @@ namespace Nostos.EditorTools
                 material.SetTexture("_BaseMap", tierra);
                 material.mainTexture = tierra;
             }
+            CespedEn(material);
             EditorUtility.SetDirty(material);
             render.sharedMaterial = material;
             go.AddComponent<MeshCollider>().sharedMesh = malla;

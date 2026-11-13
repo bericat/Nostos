@@ -11,6 +11,9 @@ Shader "Nostos/TierraRemovida" {
         _ColorQuemado ("Quemado", Color) = (0.22,0.17,0.14,1)
         _Terrones ("Terrones en el borde", Range(1, 12)) = 5
         _Fondo ("Oscuro del fondo", Range(0, 1)) = 0.38
+        _Cesped ("Césped del suelo (Grass_texture_1)", 2D) = "white" {}
+        _EscalaCesped ("Repeticiones por metro", Float) = 0.22
+        _FuerzaCesped ("Cuánto césped", Range(0, 1)) = 1
     }
     SubShader {
         Tags { "RenderPipeline"="UniversalPipeline" "Queue"="Geometry" "RenderType"="Opaque" }
@@ -23,6 +26,8 @@ Shader "Nostos/TierraRemovida" {
             float4 _ColorQuemado;
             float _Terrones;
             float _Fondo;
+            float _EscalaCesped;
+            float _FuerzaCesped;
         CBUFFER_END
         TEXTURE2D(_BaseMap);
         SAMPLER(sampler_BaseMap);
@@ -48,6 +53,7 @@ Shader "Nostos/TierraRemovida" {
             #pragma multi_compile _ _FORWARD_PLUS _CLUSTER_LIGHT_LOOP
             #pragma multi_compile_fog
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "SueloNostos.hlsl"
 
             struct Entrada {
                 float4 posOS : POSITION;
@@ -90,24 +96,9 @@ Shader "Nostos/TierraRemovida" {
                 tierra *= 1.0 - _Fondo * saturate(i.quemado.y);
                 // En el borde solo quedan los terrones (las partes claras de la textura) sobre la hierba.
                 float hayTierra = saturate((claro * 0.9 + i.color.a * 1.6 - 1.0) * _Terrones);
-                // El terreno es URP Lit no metálico: su difuso pierde un 4 %.
-                float3 albedo = lerp(ALineal(i.color.rgb) * 0.96, tierra, hayTierra);
+                float3 albedo = lerp(AlbedoSueloN(i.color.rgb, i.posWS.xz, _EscalaCesped, _FuerzaCesped), tierra, hayTierra);
 
-                Light sol = GetMainLight(TransformWorldToShadowCoord(i.posWS));
-                float3 luz = saturate(dot(n, sol.direction)) * sol.color * sol.distanceAttenuation * sol.shadowAttenuation;
-                #if defined(_ADDITIONAL_LIGHTS)
-                    InputData inputData = (InputData)0;
-                    inputData.positionWS = i.posWS;
-                    inputData.normalWS = n;
-                    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(i.posCS);
-                    uint cuantas = GetAdditionalLightsCount();
-                    LIGHT_LOOP_BEGIN(cuantas)
-                        Light otra = GetAdditionalLight(lightIndex, i.posWS, half4(1, 1, 1, 1));
-                        luz += saturate(dot(n, otra.direction)) * otra.color * otra.distanceAttenuation * otra.shadowAttenuation;
-                    LIGHT_LOOP_END
-                #endif
-
-                float3 color = (luz + SampleSH(n)) * albedo;
+                float3 color = IluminarN(albedo, n, i.posWS, i.posCS);
                 color = MixFog(color, i.niebla);
                 return half4(color, 1);
             }

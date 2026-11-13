@@ -21,6 +21,7 @@ namespace Nostos.EditorTools
             "Assets/Propsybrush/Pickaxe",
             "Assets/Holy Assets Games/3D The Blacksmith's House",
             "Assets/RealisticMeshDeformation",
+            "Assets/A_piece_of_nature",
         };
 
         [MenuItem("Nostos/Pasar paquetes a URP")]

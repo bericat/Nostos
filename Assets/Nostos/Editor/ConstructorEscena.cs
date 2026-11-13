@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F12b-surco";
+        const string Version = "F13-naturaleza";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -682,6 +682,13 @@ namespace Nostos.EditorTools
             foreach (Transform hijo in objeto.GetComponentsInChildren<Transform>(true))
             {
                 hijo.gameObject.isStatic = true;
+                if (hijo.name == "Suelo")
+                {
+                    // Césped del paquete "A piece of nature" donde la paleta es hierba.
+                    Material sueloValle = MaterialSueloValle();
+                    var renderSuelo = hijo.GetComponent<Renderer>();
+                    if (sueloValle != null && renderSuelo != null) renderSuelo.sharedMaterial = sueloValle;
+                }
                 if (hijo.name != "Agua") continue;
                 // El agua no es suelo: se vadea, no se pisa.
                 foreach (Collider c in hijo.GetComponents<Collider>()) Object.DestroyImmediate(c);
@@ -1254,6 +1261,16 @@ namespace Nostos.EditorTools
             var azar = new System.Random(11);
             var padre = new GameObject("Naturaleza").transform;
             const float Todo = Mathf.PI * 2f;
+            PaquetesURP.PasarTodo();
+
+            // Paquete "A piece of nature": su pino y sus dos rocas, tal cual, mandan sobre los demás.
+            GameObject pinoPieza = Pieza("Pine_tree");
+            var rocasPieza = new List<GameObject>();
+            foreach (string nombre in new[] { "Rock_3", "Rock_4" })
+            {
+                GameObject modelo = Pieza(nombre);
+                if (modelo != null) rocasPieza.Add(modelo);
+            }
 
             // ---- modelos
             GameObject pino = Polytope("Trees/PT_Pine_Tree_03_green");
@@ -1277,18 +1294,32 @@ namespace Nostos.EditorTools
                 GameObject modelo = Pinar(nombre);
                 if (modelo != null) pinos.Add((modelo, min, max));
             }
-            Pino("pino_1", 0.6f, 0.85f);
-            Pino("pino_2", 0.6f, 0.85f);
-            Pino("pino_3", 0.7f, 0.95f);
-            Pino("pino_4", 0.8f, 1.1f);
-            Pino("pino_5", 0.85f, 1.15f);
-            Pino("pino_6", 1.0f, 1.35f);
+            if (pinoPieza != null)
+            {
+                // El pino del paquete mide 5,4 m: de 7 a 12 m, más alguno pequeño.
+                pinos.Add((pinoPieza, 1.3f, 1.75f));
+                pinos.Add((pinoPieza, 1.6f, 2.2f));
+                pinos.Add((pinoPieza, 1.1f, 1.4f));
+            }
+            else
+            {
+                Pino("pino_1", 0.6f, 0.85f);
+                Pino("pino_2", 0.6f, 0.85f);
+                Pino("pino_3", 0.7f, 0.95f);
+                Pino("pino_4", 0.8f, 1.1f);
+                Pino("pino_5", 0.85f, 1.15f);
+                Pino("pino_6", 1.0f, 1.35f);
+            }
             GameObject toconNuevo = Pinar("tocon_pino");
             var jovenes = new List<GameObject>();
-            foreach (string nombre in new[] { "pino_joven_1", "pino_joven_2" })
+            if (pinoPieza != null) jovenes.Add(pinoPieza);
+            else
             {
-                GameObject modelo = Pinar(nombre);
-                if (modelo != null) jovenes.Add(modelo);
+                foreach (string nombre in new[] { "pino_joven_1", "pino_joven_2" })
+                {
+                    GameObject modelo = Pinar(nombre);
+                    if (modelo != null) jovenes.Add(modelo);
+                }
             }
 
             // Árboles para talar: (modelo, tocón, radio del tronco, escala mínima, máxima)
@@ -1297,7 +1328,8 @@ namespace Nostos.EditorTools
             {
                 // Cápsula en el tronco: se llega hasta él para talar y el NavMesh no se corta bajo las ramas.
                 foreach (var p in pinos) talables.Add((p.modelo, toconNuevo, 0.35f, p.min, p.max));
-                if (frondoso != null) talables.Add((frondoso, toconFrondoso, 0.42f, 0.75f, 1.0f));
+                // Con el paquete "A piece of nature", todos los árboles son su pino.
+                if (frondoso != null && pinoPieza == null) talables.Add((frondoso, toconFrondoso, 0.42f, 0.75f, 1.0f));
             }
             else if (conPolytope)
             {
@@ -1313,9 +1345,15 @@ namespace Nostos.EditorTools
                     if (modelo != null) talables.Add((modelo, null, 0f, 0.85f, 1.45f));
                 }
             }
-            GameObject veta = Polytope("Rocks/PT_Ore_Rock_01");
+            GameObject veta = rocasPieza.Count > 0 ? rocasPieza[0] : Polytope("Rocks/PT_Ore_Rock_01");
             float vetaMin = 2.4f, vetaMax = 3.2f;
-            if (veta == null)
+            if (rocasPieza.Count > 0)
+            {
+                // Las rocas del paquete miden menos de 1 m: vetas de 1,3 a 1,8 m.
+                vetaMin = 1.5f;
+                vetaMax = 2.1f;
+            }
+            else if (veta == null)
             {
                 veta = Modelo("veta");
                 vetaMin = 0.9f;
@@ -1328,7 +1366,8 @@ namespace Nostos.EditorTools
 
             // Suelo del bosque bajo cada bosquecillo: manchas de pinaza y tierra, matas y pinos jóvenes.
             var manchas = new List<GameObject>();
-            foreach (string nombre in new[] { "suelo_hierba_1", "suelo_hierba_2", "suelo_tierra_1", "suelo_tierra_2" })
+            // Sin las manchas de hierba del pinar: ahora hay hierba de verdad por todo el valle.
+            foreach (string nombre in new[] { "suelo_tierra_1", "suelo_tierra_2" })
             {
                 GameObject modelo = Pinar(nombre);
                 if (modelo != null) manchas.Add(modelo);
@@ -1384,7 +1423,8 @@ namespace Nostos.EditorTools
 
             NodoRecurso Veta(Vector3 p, float escalaMin, float escalaMax)
             {
-                GameObject roca = Plantar(veta, padre, p, azar, escalaMin, escalaMax);
+                GameObject modeloVeta = rocasPieza.Count > 1 ? rocasPieza[azar.Next(rocasPieza.Count)] : veta;
+                GameObject roca = Plantar(modeloVeta, padre, p, azar, escalaMin, escalaMax);
                 CajaVisible(roca);
                 var nodo = roca.AddComponent<NodoRecurso>();
                 nodo.recurso = Recurso.Mineral;
@@ -1478,7 +1518,8 @@ namespace Nostos.EditorTools
             // Peñascos: solo adorno, también a media ladera. Sin menhires: Toni pidió quitarlos.
             var penascos = new List<(GameObject modelo, float min, float max)>();
             GameObject piedra = Polytope("Rocks/PT_Generic_Rock_01");
-            if (piedra != null) penascos.Add((piedra, 5f, 11f));
+            foreach (GameObject roca in rocasPieza) penascos.Add((roca, 2.2f, 6.5f));
+            if (penascos.Count == 0 && piedra != null) penascos.Add((piedra, 5f, 11f));
             if (penascos.Count == 0)
             {
                 foreach (string nombre in new[] { "penasco_a", "penasco_b" })
@@ -1492,7 +1533,7 @@ namespace Nostos.EditorTools
                 if (!Buscar(valle, azar, 40f, 130f, 0f, Todo, 40f, out Vector3 p)) continue;
                 var pe = penascos[azar.Next(penascos.Count)];
                 GameObject roca = Plantar(pe.modelo, padre, p, azar, pe.min, pe.max);
-                if (pe.modelo == piedra) CajaVisible(roca);
+                if (pe.modelo == piedra || rocasPieza.Contains(pe.modelo)) CajaVisible(roca);
             }
             // Pinos en las terrazas, donde no se llega: dan vida a las montañas.
             GameObject pinoLejano = pino != null ? pino : (talables.Count > 1 ? talables[1].modelo : null);
@@ -1541,7 +1582,8 @@ namespace Nostos.EditorTools
             GameObject amapola = Polytope("Flowers/PT_Poppy_02");
             GameObject seta = Polytope("Mushrooms/PT_Caesars_Mushroom_01");
             GameObject cantos = Polytope("Rocks/PT_River_Rock_Pile_02");
-            if (hierba != null) suelo.Add((hierba, 520, 0.8f, 1.4f, RadioEdificable + 2f));
+            // La hierba alta de Polytope ya no: la pone HierbaDelValle por todo el valle.
+            if (hierba != null && Pieza("Pine_tree") == null) suelo.Add((hierba, 520, 0.8f, 1.4f, RadioEdificable + 2f));
             if (amapola != null) suelo.Add((amapola, 170, 0.8f, 1.2f, RadioEdificable + 2f));
             if (seta != null) suelo.Add((seta, 50, 0.9f, 1.6f, RadioEdificable + 4f));
             if (cantos != null) suelo.Add((cantos, 40, 1.5f, 3f, RadioEdificable + 4f));
@@ -1580,6 +1622,9 @@ namespace Nostos.EditorTools
             {
                 Veta(new Vector3(-7f, 0f, -9f), vetaMin, vetaMin + 0.2f);
             }
+
+            // Hierba densa por todo el valle (paquete "A piece of nature").
+            SembrarHierba();
         }
 
         /// <summary>
