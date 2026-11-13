@@ -92,9 +92,11 @@ namespace Nostos
         readonly int[] objetivo = new int[2];
         readonly int[] posicion = new int[2];
         int anillo;
-        // Martillo
+        // Martillo: primero se elige qué forjar
         int golpes;
         float fase;
+        bool eligiendo;
+        int eleccion;
         // Guiso y manivela
         float nivel;
         int esperado;
@@ -143,7 +145,7 @@ namespace Nostos
                 case TipoFaena.Manivela:
                     return "Subir un cubo con la manivela";
                 case TipoFaena.Martillo:
-                    return "Forjar herramientas (1 de madera)";
+                    return "Forjar herramientas";
                 case TipoFaena.Confort:
                     return e.Confort >= Edificio.ConfortMaximo
                         ? "La casa ya está todo lo cómoda que puede"
@@ -169,12 +171,6 @@ namespace Nostos
             if (nuevo == TipoFaena.Confort)
             {
                 MejorarCasa(juego, e);
-                return;
-            }
-            if (nuevo == TipoFaena.Martillo
-                && juego.Mundo.Mochila[Recurso.Madera] + juego.Mundo.Almacen[Recurso.Madera] < 1)
-            {
-                juego.Avisar("Para hacer mangos hace falta 1 de madera, en la mochila o en el almacén.");
                 return;
             }
             if (nuevo == TipoFaena.Guiso)
@@ -216,6 +212,8 @@ namespace Nostos
                 case TipoFaena.Martillo:
                     golpes = 0;
                     fase = 0f;
+                    eligiendo = true;
+                    eleccion = PrimeraQueFalta(juego.Mundo);
                     break;
                 case TipoFaena.Lentes:
                     anillo = 0;
@@ -287,6 +285,18 @@ namespace Nostos
                 case TipoFaena.Martillo:
                 {
                     Mundo m = juego.Mundo;
+                    if (eleccion < Equipo.Numero)
+                    {
+                        var h = (Herramienta)eleccion;
+                        if (!m.PagarAMano(Equipo.Coste(h)))
+                        {
+                            mensaje = "Te falta material: " + Recursos.Lista(Equipo.Coste(h)) + ".";
+                            break;
+                        }
+                        m.Equipo.Dar(h);
+                        mensaje = MensajeForja(h);
+                        break;
+                    }
                     if (m.Mochila.Sacar(Recurso.Madera, 1) == 0 && m.Almacen.Sacar(Recurso.Madera, 1) == 0)
                     {
                         mensaje = "Te has quedado sin madera para los mangos.";
@@ -295,7 +305,7 @@ namespace Nostos
                     int metidas = m.Mochila.Meter(Recurso.Herramientas, HerramientasMartillo);
                     if (metidas < HerramientasMartillo) e.Salida.Meter(Recurso.Herramientas, HerramientasMartillo - metidas);
                     mensaje = "Cabezas bien templadas y mangos firmes: " + HerramientasMartillo
-                              + " herramientas. Con ellas en la mochila talas y picas el doble.";
+                              + " herramientas para el pueblo. Los colonos trabajan mejor con ellas.";
                     break;
                 }
             }
@@ -426,15 +436,90 @@ namespace Nostos
                 case TipoFaena.Lentes: Lentes(direccion); break;
                 case TipoFaena.Guiso: Guiso(dt, direccion); break;
                 case TipoFaena.Manivela: Manivela(dt); break;
-                case TipoFaena.Martillo: Martillo(dt); break;
+                case TipoFaena.Martillo: Martillo(dt, direccion); break;
             }
         }
 
         /// <summary>Altura del martillo (0 abajo, 1 arriba). Cada golpe acertado lo hace más rápido.</summary>
         float AlturaMartillo => 0.5f - 0.5f * Mathf.Cos(fase);
 
-        void Martillo(float dt)
+        // ---- qué se forja en el banco
+
+        /// <summary>Opciones del banco: las cuatro herramientas de Nicias y, al final, las del pueblo.</summary>
+        const int OpcionesBanco = Equipo.Numero + 1;
+        static readonly Cantidad[] CostePueblo = { new Cantidad(Recurso.Madera, 1) };
+
+        static Cantidad[] CosteOpcion(int i) => i < Equipo.Numero ? Equipo.Coste((Herramienta)i) : CostePueblo;
+
+        static string NombreOpcion(int i)
         {
+            if (i >= Equipo.Numero) return "Herramientas para el pueblo (" + HerramientasMartillo + ")";
+            string n = Equipo.Nombre((Herramienta)i);
+            return char.ToUpperInvariant(n[0]) + n.Substring(1);
+        }
+
+        static string ParaQueOpcion(int i)
+        {
+            switch (i)
+            {
+                case 0: return "Talas el doble.";
+                case 1: return "Picas el doble de mineral.";
+                case 2: return "Sacas el doble de cobre.";
+                case 3: return "Mineral triple y cobre doble. Dura el doble.";
+                default: return "Los colonos las cogen del almacén.";
+            }
+        }
+
+        static int PrimeraQueFalta(Mundo mundo)
+        {
+            for (int i = 0; i < Equipo.Numero; i++)
+            {
+                if (i == (int)Herramienta.PicoBueno) continue;
+                if (!mundo.Equipo.Tiene((Herramienta)i) && mundo.AlAlcance(CosteOpcion(i))) return i;
+            }
+            return mundo.AlAlcance(Equipo.Coste(Herramienta.PicoBueno)) && !mundo.Equipo.Tiene(Herramienta.PicoBueno)
+                ? (int)Herramienta.PicoBueno
+                : 0;
+        }
+
+        static string MensajeForja(Herramienta h)
+        {
+            switch (h)
+            {
+                case Herramienta.Hacha: return "Un hacha con buen filo: ahora cada golpe a un árbol da el doble de madera.";
+                case Herramienta.Pico: return "Un pico recio: cada golpe a una veta da el doble de mineral.";
+                case Herramienta.Pala: return "Una pala de hoja ancha: el cobre sale el doble de rápido.";
+                default: return "El mejor pico que se ha visto en Nova Lavinia: triple de mineral, doble de cobre, y aguanta el doble.";
+            }
+        }
+
+        void ElegirForja(int direccion)
+        {
+            if (direccion == Arriba) eleccion = (eleccion + OpcionesBanco - 1) % OpcionesBanco;
+            else if (direccion == Abajo) eleccion = (eleccion + 1) % OpcionesBanco;
+            if (!Pulsa()) return;
+            Juego juego = Juego.Instancia;
+            if (juego == null) return;
+            if (!juego.Mundo.AlAlcance(CosteOpcion(eleccion)))
+            {
+                juego.Avisar("Para " + (eleccion < Equipo.Numero ? Equipo.ConArticulo((Herramienta)eleccion) : "eso")
+                             + " hace falta " + Recursos.Lista(CosteOpcion(eleccion)) + ", en la mochila o en el almacén.");
+                Sonido.Tocar(Efecto.Paso, 0.4f, true);
+                return;
+            }
+            eligiendo = false;
+            golpes = 0;
+            fase = 0f;
+            Sonido.Tocar(Efecto.Golpe, 0.5f, true);
+        }
+
+        void Martillo(float dt, int direccion)
+        {
+            if (eligiendo)
+            {
+                ElegirForja(direccion);
+                return;
+            }
             fase += dt * (2.6f + 0.7f * golpes);
             if (!Pulsa()) return;
             float altura = AlturaMartillo;
@@ -611,8 +696,10 @@ namespace Nostos
                     ayuda = "Arriba y abajo cambian de anillo; izquierda y derecha lo giran. El haz brilla más cuanto mejor alineadas están.";
                     break;
                 case TipoFaena.Martillo:
-                    nombre = "Forjar herramientas";
-                    ayuda = "Pulsa cuando el martillo esté en lo alto, dentro de la franja, para dar el golpe con fuerza. Cuatro golpes, cada vez más rápido.";
+                    nombre = eligiendo ? "Forjar herramientas" : "Forjar " + (eleccion < Equipo.Numero ? Equipo.ConArticulo((Herramienta)eleccion) : "herramientas");
+                    ayuda = eligiendo
+                        ? "Elige qué forjar. Se paga con lo que lleves y con lo del almacén."
+                        : "Pulsa cuando el martillo esté en lo alto, dentro de la franja, para dar el golpe con fuerza. Cuatro golpes, cada vez más rápido.";
                     break;
                 case TipoFaena.Guiso:
                     nombre = "Cocinar un guiso";
@@ -644,6 +731,10 @@ namespace Nostos
             float pie = panel.yMax - 26f;
             switch (tipo)
             {
+                case TipoFaena.Martillo when eligiendo:
+                    Tema.Indicaciones(panel.center.x, pie, Tema.Pequeno, (Boton.Elegir, "elegir"), (Boton.Accion, "forjar"),
+                        (Boton.Faena, "dejarlo"));
+                    break;
                 case TipoFaena.Sierra:
                 case TipoFaena.Manivela:
                 case TipoFaena.Martillo:
@@ -686,6 +777,11 @@ namespace Nostos
 
         void DibujarMartillo(Rect zona)
         {
+            if (eligiendo)
+            {
+                DibujarEleccion(zona);
+                return;
+            }
             // A la izquierda, el golpe en vertical; a la derecha, los golpes dados.
             var pista = new Rect(zona.x + 40f, zona.y - 4f, 46f, zona.height + 4f);
             Tema.Relleno(pista, Tema.FondoHueco, 8f);
@@ -710,6 +806,35 @@ namespace Nostos
                 Tema.Filo(r, i == golpes ? Tema.Ocre : new Color(Tema.Borde.r, Tema.Borde.g, Tema.Borde.b, 0.35f),
                     i == golpes ? 2f : 1f, 10f);
                 if (hecho) Tema.Icono(new Rect(r.x + 10f, r.y + 10f, 36f, 36f), Recurso.Herramientas);
+            }
+        }
+
+        void DibujarEleccion(Rect zona)
+        {
+            Juego juego = Juego.Instancia;
+            Mundo mundo = juego != null ? juego.Mundo : null;
+            const float fila = 25f;
+            float y = zona.y - 8f;
+            for (int i = 0; i < OpcionesBanco; i++)
+            {
+                var r = new Rect(zona.x, y + i * fila, zona.width, fila - 3f);
+                bool elegida = i == eleccion;
+                bool llega = mundo != null && mundo.AlAlcance(CosteOpcion(i));
+                if (elegida)
+                {
+                    Tema.Relleno(r, new Color(Tema.Ocre.r, Tema.Ocre.g, Tema.Ocre.b, 0.25f), 6f);
+                    Tema.Filo(r, Tema.Ocre, 1.5f, 6f);
+                }
+                Color tinta = llega ? (elegida ? Tema.Ocre : Tema.Pergamino) : Tema.Apagado;
+                string tiene = "";
+                if (mundo != null && i < Equipo.Numero && mundo.Equipo.Tiene((Herramienta)i))
+                {
+                    var h = (Herramienta)i;
+                    tiene = "  · la tienes (" + mundo.Equipo.Golpes(h) + "/" + Equipo.Aguante(h) + ")";
+                }
+                Tema.Escribir(new Rect(r.x + 10f, r.y, r.width * 0.42f, r.height), NombreOpcion(i) + tiene, Tema.Pequeno, tinta);
+                Tema.Escribir(new Rect(r.x + r.width * 0.42f, r.y, r.width * 0.3f, r.height), Recursos.Lista(CosteOpcion(i)), Tema.Pequeno, tinta);
+                Tema.Escribir(new Rect(r.x + r.width * 0.72f, r.y, r.width * 0.28f - 6f, r.height), ParaQueOpcion(i), Tema.Pequeno, Tema.Apagado);
             }
         }
 

@@ -60,6 +60,8 @@ namespace Nostos
             public int dia;
             public int[] mochila;
             public int[] almacen;
+            /// <summary>Golpes que le quedan a cada herramienta de Nicias.</summary>
+            public int[] equipo;
             public Vector3 posicionJugador;
             public List<EdificioGuardado> edificios = new List<EdificioGuardado>();
             public List<ColonoGuardado> colonos = new List<ColonoGuardado>();
@@ -88,6 +90,7 @@ namespace Nostos
                 dia = mundo.Ciclo.Dia,
                 mochila = mundo.Mochila.Volcar(),
                 almacen = mundo.Almacen.Volcar(),
+                equipo = mundo.Equipo.Volcar(),
                 posicionJugador = jugador != null ? jugador.position : Vector3.zero,
                 tributoDia = mundo.Tributo.DiaProximo,
                 tributoVisitas = mundo.Tributo.Visitas,
@@ -172,6 +175,7 @@ namespace Nostos
             mundo.Sincronizar();
             mundo.Mochila.Cargar(partida.mochila);
             mundo.Almacen.Cargar(partida.almacen);
+            mundo.Equipo.Cargar(partida.equipo);
             mundo.Tributo.DiaProximo = partida.tributoDia;
             mundo.Tributo.Visitas = partida.tributoVisitas;
             mundo.Tributo.ArcontePresente = partida.arcontePresente;

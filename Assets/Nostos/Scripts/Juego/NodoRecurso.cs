@@ -62,8 +62,21 @@ namespace Nostos
                 return;
             }
 
-            // Con herramientas en la mochila sale una unidad más, y cada herramienta se gasta.
-            if (juego.Mundo.Mochila[Recurso.Herramientas] > 0 && !rebrota)
+            // Con el hacha, el pico o la pala sale más en cada golpe, y la herramienta se gasta.
+            // Sin ellas, las herramientas del pueblo que lleve en la mochila dan una más.
+            Equipo equipo = juego.Mundo.Equipo;
+            if (!rebrota && equipo.ParaRecoger(recurso, out Herramienta h, out int extra))
+            {
+                for (int i = 0; i < extra && unidades > 1; i++)
+                {
+                    if (juego.Mundo.Mochila.Meter(recurso, 1) == 0) break;
+                    unidades--;
+                }
+                if (equipo.Gastar(h))
+                    juego.Avisar("Se te ha roto " + Equipo.ConArticulo(h) + ". En el banco de trabajo puedes forjar " + (h == Herramienta.Pala ? "otra." : "otro."));
+                ManoNicias.Golpe(h);
+            }
+            else if (juego.Mundo.Mochila[Recurso.Herramientas] > 0 && !rebrota)
             {
                 if (unidades > 1 && juego.Mundo.Mochila.Meter(recurso, 1) > 0) unidades--;
                 if (juego.Mundo.GastarHerramienta())

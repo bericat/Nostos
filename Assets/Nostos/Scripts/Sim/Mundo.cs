@@ -321,6 +321,8 @@ namespace Nostos.Sim
         public Nave Nave { get; } = new Nave();
         /// <summary>Lo guardado en el almacén. Solo se puede usar si hay un almacén terminado.</summary>
         public Bolsa Almacen { get; } = new Bolsa();
+        /// <summary>Hacha, pico y pala de Nicias, con lo que les queda.</summary>
+        public Equipo Equipo { get; } = new Equipo();
         public GestorColonos Colonos { get; }
         public Tributo Tributo { get; } = new Tributo();
         /// <summary>Avisos de la simulación para mostrar en pantalla.</summary>
@@ -402,6 +404,28 @@ namespace Nostos.Sim
             if (golpesConHerramienta < GolpesPorHerramienta) return false;
             golpesConHerramienta = 0;
             Mochila.Sacar(Recurso.Herramientas, 1);
+            return true;
+        }
+
+        /// <summary>¿Hay esto entre la mochila y el almacén?</summary>
+        public bool AlAlcance(Cantidad[] coste)
+        {
+            foreach (Cantidad c in coste)
+            {
+                if (Mochila[c.recurso] + Almacen[c.recurso] < c.cantidad) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Lo paga primero de la mochila y luego del almacén. Devuelve false (sin quitar nada) si no llega.</summary>
+        public bool PagarAMano(Cantidad[] coste)
+        {
+            if (!AlAlcance(coste)) return false;
+            foreach (Cantidad c in coste)
+            {
+                int falta = c.cantidad - Mochila.Sacar(c.recurso, c.cantidad);
+                if (falta > 0) Almacen.Sacar(c.recurso, falta);
+            }
             return true;
         }
 

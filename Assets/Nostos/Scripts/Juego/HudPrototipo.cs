@@ -67,7 +67,8 @@ namespace Nostos
             {
                 Etiquetas(aPie);
                 float y = FichaNicias(mundo, aPie);
-                Mochila(mundo.Mochila, y + 8f);
+                float ym = Mochila(mundo.Mochila, y + 8f);
+                EquipoNicias(mundo.Equipo, ym + 6f);
                 float yd = BarraRecursos(mundo);
                 yd = Minimapa(mundo, aPie, yd + 16f);
                 Objetivo(mundo, yd + 10f);
@@ -172,7 +173,7 @@ namespace Nostos
         }
 
         /// <summary>Lo que lleva Nicias, en fichas pequeñas bajo su retrato.</summary>
-        void Mochila(Bolsa mochila, float y)
+        float Mochila(Bolsa mochila, float y)
         {
             float x = Margen;
             const float alto = 32f;
@@ -192,6 +193,28 @@ namespace Nostos
                 Tema.Ficha(ficha, 0.85f);
                 Tema.Icono(new Rect(ficha.x + 5f, ficha.y + 3f, 26f, 26f), r);
                 Tema.Escribir(new Rect(ficha.x + 33f, ficha.y, w - 33f, alto), n, Tema.Cifra);
+                x += w + 6f;
+            }
+            return x > Margen ? y + alto : y - 6f;
+        }
+
+        /// <summary>Hacha, pico y pala que lleva, con lo que les queda, bajo la mochila.</summary>
+        void EquipoNicias(Equipo equipo, float y)
+        {
+            float x = Margen;
+            const float alto = 24f;
+            for (int i = 0; i < Equipo.Numero; i++)
+            {
+                var h = (Herramienta)i;
+                if (!equipo.Tiene(h)) continue;
+                string texto = Equipo.Nombre(h) + " " + equipo.Golpes(h);
+                float w = Tema.AnchoDe(texto, Tema.Pequeno) + 34f;
+                var ficha = new Rect(x, y, w, alto);
+                Tema.Ficha(ficha, 0.75f);
+                float queda = equipo.Golpes(h) / (float)Equipo.Aguante(h);
+                Tema.Escribir(new Rect(ficha.x + 10f, ficha.y, w - 14f, alto - 4f), texto, Tema.Pequeno,
+                    queda < 0.2f ? Tema.Rojo : Tema.Pergamino);
+                Tema.Barra(new Rect(ficha.x + 8f, ficha.yMax - 6f, w - 16f, 3f), queda, queda < 0.2f ? Tema.Rojo : Tema.Ocre);
                 x += w + 6f;
             }
         }

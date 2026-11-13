@@ -48,7 +48,7 @@ namespace Nostos
         static readonly Dictionary<string, string> Descripciones = new Dictionary<string, string>
         {
             { "refugio", "Donde Nicias duerme y pasa la noche a salvo. Lo primero que hay que levantar." },
-            { "banco", "Un banco con tornillo y muela. Convierte madera en herramientas: con ellas se tala y se pica más." },
+            { "banco", "Un banco con tornillo y muela. Aquí forjas tu hacha, tu pico y tu pala, y herramientas para el pueblo." },
             { "aserradero", "Sierra la madera en tablones, el material de casi todo lo demás." },
             { "fundicion", "Funde el mineral en lingotes y chapa. Necesita leña para el horno." },
             { "almacen", "Guarda lo que traen Nicias y los colonos. Sin almacén no hay reparto ni porteadores." },

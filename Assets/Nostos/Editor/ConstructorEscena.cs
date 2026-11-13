@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F15-rocas";
+        const string Version = "F16-herramientas";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -313,6 +313,15 @@ namespace Nostos.EditorTools
             cuerpoNicias.cabeza = cabeza.transform;
             cuerpoNicias.camara = camaraGo.transform;
             cuerpoNicias.modelo = cuerpoVisible;
+
+            // La herramienta en la mano (hacha, pico, pala): se ve solo en primera persona.
+            var manoGo = new GameObject("Mano");
+            manoGo.transform.SetParent(cabeza.transform, false);
+            var mano = manoGo.AddComponent<ManoNicias>();
+            mano.pie = controlador;
+            mano.control = control;
+            mano.camara = camaraGo.transform;
+            mano.modelos = HerramientasEnMano(manoGo.transform);
 
             // Cámara del título: un travelling lento sobre el valle, sin Nicias (portada de la F10)
             var camTituloGo = new GameObject("Cámara título");
