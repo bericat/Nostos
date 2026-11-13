@@ -89,6 +89,12 @@ namespace Nostos.EditorTools
         static void AlCargar()
         {
             EditorApplication.delayCall += () => Revisar(false);
+            // Las capturas de comparación siguen al recargar el código al entrar en Play.
+            if (SessionState.GetBool(CapturasReferencia.ClavePedidas, false))
+            {
+                EditorApplication.update -= VigilarCapturas;
+                EditorApplication.update += VigilarCapturas;
+            }
             // Si la recompilación llega al darle a Play, la escena vieja no se juega: se para, se
             // monta la nueva y se avisa. Al volver de Play también se revisa.
             EditorApplication.playModeStateChanged -= AlCambiarModo;
@@ -108,13 +114,20 @@ namespace Nostos.EditorTools
             }
             else if (cambio == PlayModeStateChange.EnteredEditMode)
             {
-                EditorApplication.delayCall += () => Revisar(false);
+                EditorApplication.delayCall += () =>
+                {
+                    if (!VolverDeCapturas()) Revisar(false);
+                };
             }
         }
 
         static void Revisar(bool forzar)
         {
-            if (EscenaAlDia) return;
+            if (EscenaAlDia)
+            {
+                RevisarCapturas();
+                return;
+            }
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             // Un solo intento automático por sesión del editor (salvo al ir a jugar); después, por el menú.
             if (!forzar && SessionState.GetBool("Nostos.Escena." + Version, false)) return;
@@ -125,6 +138,7 @@ namespace Nostos.EditorTools
                 return;
             }
             Crear();
+            RevisarCapturas();
         }
 
         [MenuItem("Nostos/Crear escena")]
