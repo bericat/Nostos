@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F14-fuego";
+        const string Version = "F15-rocas";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -941,6 +941,21 @@ namespace Nostos.EditorTools
         }
 
         /// <summary>Caja con el tamaño de lo que se ve, para rocas (algo más estrecha que la roca).</summary>
+        /// <summary>Roca que se abolla y suelta esquirlas al picarla. La malla tiene que ser legible.</summary>
+        static void Picable(GameObject roca)
+        {
+            foreach (MeshFilter f in roca.GetComponentsInChildren<MeshFilter>())
+            {
+                if (f.sharedMesh == null || f.sharedMesh.isReadable) continue;
+                var importador = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(f.sharedMesh)) as ModelImporter;
+                if (importador == null || importador.isReadable) continue;
+                importador.isReadable = true;
+                importador.SaveAndReimport();
+            }
+            var picable = roca.AddComponent<RocaPicable>();
+            picable.polvo = MaterialHumo();
+        }
+
         static void CajaVisible(GameObject objeto, float encoger = 0.85f)
         {
             if (objeto.GetComponentInChildren<Collider>() != null) return;
@@ -1432,6 +1447,7 @@ namespace Nostos.EditorTools
                 nodo.recurso = Recurso.Mineral;
                 nodo.unidades = 8;
                 nodo.verbo = "Picar";
+                Picable(roca);
                 return nodo;
             }
 
@@ -1461,6 +1477,7 @@ namespace Nostos.EditorTools
             {
                 if (!Buscar(valle, azar, 58f, 90f, 0f, Todo, 2.4f, out Vector3 p)) continue;
                 var nodo = Plantar(cobre, padre, p, azar, 0.9f, 1.3f).AddComponent<NodoRecurso>();
+                Picable(nodo.gameObject);
                 nodo.recurso = Recurso.Cobre;
                 nodo.unidades = 6;
                 nodo.verbo = "Extraer cobre";

@@ -74,6 +74,7 @@ namespace Nostos
             golpe = 1f;
             Sonido.Tocar(Efecto.Golpe, 0.8f, true);
             Mostrar();
+            Picar(quien);
             if (unidades <= 0 && !rebrota)
             {
                 if (restos != null)
@@ -83,6 +84,30 @@ namespace Nostos
                 }
                 Destroy(gameObject);
             }
+        }
+
+        /// <summary>Las rocas y vetas se abollan donde da el pico y sueltan esquirlas.</summary>
+        void Picar(GameObject quien)
+        {
+            var roca = GetComponent<RocaPicable>();
+            if (roca == null) return;
+            Vector3 punto = transform.position;
+            Vector3 direccion = Vector3.down;
+            var pie = quien != null ? quien.GetComponent<ControladorAPie>() : null;
+            Camera camara = Camera.main;
+            if (pie != null && camara != null)
+            {
+                punto = pie.PuntoEnfocado;
+                direccion = camara.transform.forward;
+            }
+            else if (quien != null)
+            {
+                var caja = GetComponentInChildren<Collider>();
+                Vector3 desde = quien.transform.position + Vector3.up;
+                if (caja != null) punto = caja.ClosestPoint(desde);
+                direccion = punto - desde;
+            }
+            roca.Golpear(punto, direccion, unidades <= 0 && !rebrota);
         }
 
         /// <summary>Un frutal sin fruta se ve como un árbol verde hasta que rebrota.</summary>
