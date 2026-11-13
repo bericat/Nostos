@@ -21,7 +21,7 @@ namespace Nostos.EditorTools
     /// </summary>
     public static partial class ConstructorEscena
     {
-        const string Version = "F13-naturaleza";
+        const string Version = "F14-fuego";
         const string RutaMarca = "Library/NostosEscena.txt";
         const string RutaEscena = "Assets/Nostos/Escenas/Nostos.unity";
         const string RutaAcciones = "Assets/Nostos/Input/NostosInput.inputactions";
@@ -445,6 +445,8 @@ namespace Nostos.EditorTools
             plaza.transform.position = new Vector3(14f, 0f, -12f);
             juego.plaza = plaza.transform;
             var modeloHoguera = AssetDatabase.LoadAssetAtPath<GameObject>(ImportadorKit.CarpetaArte + "/Naturaleza/hoguera.fbx");
+            // La hoguera con el fuego del paquete; su luz es la de la plaza, que parpadea.
+            modeloHoguera = ConFuego(modeloHoguera, "hoguera", false);
             if (modeloHoguera != null)
             {
                 var hoguera = (GameObject)PrefabUtility.InstantiatePrefab(modeloHoguera, plaza.transform);
@@ -458,6 +460,9 @@ namespace Nostos.EditorTools
             luzHoguera.color = new Color(1f, 0.6f, 0.28f);
             luzHoguera.intensity = 14f;
             luzHoguera.range = 14f;
+            var llamaHoguera = luzHogueraGo.AddComponent<Llama>();
+            llamaHoguera.luz = luzHoguera;
+            llamaHoguera.intensidad = 14f;
             AudioClip clipFuego = Clip("fuego");
             if (clipFuego != null)
             {
@@ -637,6 +642,8 @@ namespace Nostos.EditorTools
                 if (modelos[i] == null) Debug.LogWarning("Nostos: falta el modelo " + rutaModelo + ".");
             }
             if (id == "comedor" && modelos[3] != null) modelos[3] = ComedorConMesa(modelos[3]);
+            // Hogares, hornos y la olla: fuego del paquete en lugar de las llamas de color plano.
+            for (int i = 0; i < 4; i++) modelos[i] = ConFuego(modelos[i], id + "_" + (i + 1));
             definicion.modelos = modelos;
             EditorUtility.SetDirty(definicion);
             return definicion;
@@ -881,14 +888,9 @@ namespace Nostos.EditorTools
                 tunel.AddComponent<Tunel>().juego = juego;
                 foreach (float lado in new[] { -2.2f, 2.2f })
                 {
-                    var luzGo = new GameObject("Antorcha");
-                    luzGo.transform.SetParent(tunel.transform, false);
-                    luzGo.transform.localPosition = new Vector3(lado, 3f, -2.5f);
-                    var luz = luzGo.AddComponent<Light>();
-                    luz.type = LightType.Point;
-                    luz.color = new Color(1f, 0.62f, 0.3f);
-                    luz.intensity = 10f;
-                    luz.range = 9f;
+                    // Antorchas con el fuego rojo del paquete y su luz.
+                    Llama antorcha = PonerLlama(tunel.transform, new Vector3(lado, 2.75f, -2.5f), 0.3f, 10f, 9f);
+                    antorcha.name = "Antorcha";
                 }
             }
 

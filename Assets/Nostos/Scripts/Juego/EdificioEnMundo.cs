@@ -18,6 +18,7 @@ namespace Nostos
         GameObject modelo;
         Transform movil;
         Light luzTrabajo;
+        Llama[] llamas;
         EstadoObra estadoMostrado;
         float intensidadLuz;
         bool iniciado;
@@ -53,6 +54,14 @@ namespace Nostos
             {
                 movil.Rotate(540f * Time.deltaTime, 0f, 0f, Space.Self);
             }
+            // Los fuegos de los talleres (hornos, fraguas) arden mientras se trabaja; los hogares, siempre.
+            if (llamas != null && Definicion.tipo == TipoEdificio.Produccion)
+            {
+                foreach (Llama llama in llamas)
+                {
+                    if (llama != null) llama.encendida = trabajando;
+                }
+            }
             if (luzTrabajo != null)
             {
                 float objetivo = trabajando ? 5f + Mathf.PerlinNoise(Time.time * 6f, 0.3f) * 5f : 0f;
@@ -71,6 +80,7 @@ namespace Nostos
             }
             movil = null;
             luzTrabajo = null;
+            llamas = null;
             tejado = null;
             tejadoOculto = false;
             estadoMostrado = Sim.Estado;
@@ -86,6 +96,7 @@ namespace Nostos
             iniciado = true;
             if (modelo == null) return;
 
+            llamas = modelo.GetComponentsInChildren<Llama>(true);
             Transform piezaTejado = Buscar(modelo.transform, "Tejado");
             if (piezaTejado != null) tejado = piezaTejado.GetComponentsInChildren<Renderer>(true);
 
